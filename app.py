@@ -342,70 +342,11 @@ elif page == "About":
         - Matplotlib
         - WordCloud
         """)
-
 # Add footer
 st.markdown("""
 <div class='footer'>
     <p>Submitted to: Guidance Tamil Nadu - BIU Team</p>
     <p>Assignment Part 2: Web Scraping & Sentiment Analysis</p>
     <p>© 2023 All Rights Reserved</p>
-</div># Add this to your sentiment_analysis.py file
-def create_timeline_visualization(results_df):
-    # Convert timestamp to datetime if it's not already
-    if 'timestamp' in results_df.columns:
-        try:
-            # Sort by timestamp
-            time_df = results_df.copy()
-            time_df['date'] = pd.to_datetime(time_df['timestamp'])
-            time_df = time_df.sort_values('date')
-            
-            # Create timeline figure
-            fig = px.scatter(time_df, x='date', y='sentiment_score', 
-                           color='sentiment', size_max=10,
-                           hover_data=['title', 'source'],
-                           color_discrete_map={'Positive': '#4CAF50', 
-                                              'Neutral': '#2196F3', 
-                                              'Negative': '#F44336'})
-            
-            fig.update_layout(
-                title='News Sentiment Timeline',
-                xaxis_title='Publication Date',
-                yaxis_title='Sentiment Score',
-                hovermode='closest'
-            )
-            
-            return fig
-        except Exception as e:
-            print(f"Timeline creation error: {str(e)}")
-            return None
-    return None# Add this to your sentiment_analysis.py file
-def create_timeline_visualization(results_df):
-    # Convert timestamp to datetime if it's not already
-    if 'timestamp' in results_df.columns:
-        try:
-            # Sort by timestamp
-            time_df = results_df.copy()
-            time_df['date'] = pd.to_datetime(time_df['timestamp'])
-            time_df = time_df.sort_values('date')
-            
-            # Create timeline figure
-            fig = px.scatter(time_df, x='date', y='sentiment_score', 
-                           color='sentiment', size_max=10,
-                           hover_data=['title', 'source'],
-                           color_discrete_map={'Positive': '#4CAF50', 
-                                              'Neutral': '#2196F3', 
-                                              'Negative': '#F44336'})
-            
-            fig.update_layout(
-                title='News Sentiment Timeline',
-                xaxis_title='Publication Date',
-                yaxis_title='Sentiment Score',
-                hovermode='closest'
-            )
-            
-            return fig
-        except Exception as e:
-            print(f"Timeline creation error: {str(e)}")
-            return None
-    return None
+</div>
 """, unsafe_allow_html=True)
