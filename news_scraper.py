@@ -1,66 +1,43 @@
+import feedparser
 import requests
-import pandas as pd
 from datetime import datetime
+import time
+import pycountry
+import re
 
-def scrape_news(source, keywords, num_articles):
-    """
-    Scrape news articles from various sources based on keywords
+def extract_countries(text):
+    """Extract country mentions from text"""
+    country_list = [country.name for country in pycountry.countries]
+    found_countries = []
+    for country in country_list:
+        if re.search(r'\b' + re.escape(country) + r'\b', text, re.IGNORECASE):
+            found_countries.append(country)
+    return ', '.join(found_countries) if found_countries else 'Not specified'
+
+def scrape_google_news(keywords, num_articles=5):
+    """Scrape news from Google News RSS feed"""
+    articles = []
     
-    Parameters:
-    source (str): The news source to scrape from (NewsAPI, Reuters, Bloomberg)
-    keywords (list): List of keywords to filter news
-    num_articles (int): Number of articles to retrieve
-    
-    Returns:
-    list: List of dictionaries containing news data
-    """
-    news_data = []
-    
-    try:
-        if source == "NewsAPI":
-            # Using NewsData.io API (similar to what you used in your notebooks)
-            api_key = "pub_86076086703c94c2637e240672a4a90a30ad9"  # Replace with your actual API key if different
-            
-            for keyword in keywords:
-                url = f"https://newsdata.io/api/1/news?apikey={api_key}&q={keyword}&language=en&category=business,technology"
-                
-                response = requests.get(url)
-                if response.status_code == 200:
-                    data = response.json()
-                    articles = data.get('results', [])
-                    
-                    for article in articles:
-                        if len(news_data) >= num_articles:
-                            break
-                            
-                        if article.get('title') and article.get('link'):
-                            news_data.append({
-                                'title': article['title'],
-                                'url': article['link'],
-                                'timestamp': article.get('pubDate', 'Unknown'),
-                                'source': article.get('source_id', 'NewsAPI'),
-                                'country': article.get('country', ['Unknown'])[0] if isinstance(article.get('country'), list) else 'Unknown'
-                            })
+    for keyword in keywords:
+        feed_url = f'https://news.google.com/rss/search?q={keyword}+business&hl=en-US&gl=US&ceid=US:en'
+        news_feed = feedparser.parse(feed_url)
         
-        elif source == "Reuters" or source == "Bloomberg":
-            # For demonstration purposes, return sample data
-            # In a real implementation, you would use web scraping or their APIs
-            sample_sources = {
-                "Reuters": "Reuters News",
-                "Bloomberg": "Bloomberg News"
-            }
+        for entry in news_feed.entries[:num_articles]:
+            articles.append({
+                'title': entry.title,
+                'url': entry.link,
+                'timestamp': datetime.strptime(entry.published, '%a, %d %b %Y %H:%M:%S %Z').strftime('%Y-%m-%d %H:%M:%S'),
+                'source': 'Google News',
+                'country': extract_countries(entry.title)
+            })
+            time.sleep(0.1)
             
-            for i in range(min(num_articles, 10)):
-                news_data.append({
-                    'title': f"Sample {keywords[i % len(keywords)]} news article {i+1}",
-                    'url': f"https://example.com/article{i+1}",
-                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    'source': sample_sources.get(source, source),
-                    'country': "Global"
-                })
-    
-    except Exception as e:
-        print(f"Error scraping news: {e}")
-        return []
-    
-    return news_data[:num_articles]
+    return articles
+
+def scrape_news(source, keywords, num_articles=20):
+    """Main function to scrape news from selected source"""
+    if source == "Google News":
+        return scrape_google_news(keywords, num_articles)
+    else:
+        # Add other news sources as needed
+        return scrape_google_news(keywords, num_articles)

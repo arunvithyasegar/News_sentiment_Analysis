@@ -1,85 +1,51 @@
+import nltk
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import plotly.express as px
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-def get_sentiment_category(score):
-    """
-    Convert sentiment score to category
-    
-    Parameters:
-    score (float): Sentiment score from VADER
-    
-    Returns:
-    str: Sentiment category (Positive, Neutral, Negative)
-    """
-    if score >= 0.05:
-        return 'Positive'
-    elif score <= -0.05:
-        return 'Negative'
-    else:
-        return 'Neutral'
+# Download VADER lexicon
+nltk.download('vader_lexicon', quiet=True)
 
 def analyze_sentiment(news_data):
-    """
-    Analyze sentiment of news headlines
-    
-    Parameters:
-    news_data (list): List of dictionaries containing news data
-    
-    Returns:
-    list: List of dictionaries with sentiment analysis added
-    """
-    # Initialize VADER sentiment analyzer
+    """Analyze sentiment of news headlines using VADER"""
     sid = SentimentIntensityAnalyzer()
     
-    # Add sentiment analysis to each news item
-    for item in news_data:
-        # Get sentiment scores
-        sentiment_scores = sid.polarity_scores(item['title'])
+    for article in news_data:
+        scores = sid.polarity_scores(article['title'])
+        article['sentiment_score'] = scores['compound']
         
-        # Add sentiment score and category
-        item['sentiment_score'] = sentiment_scores['compound']
-        item['sentiment'] = get_sentiment_category(sentiment_scores['compound'])
+        if scores['compound'] >= 0.05:
+            article['sentiment'] = 'Positive'
+        elif scores['compound'] <= -0.05:
+            article['sentiment'] = 'Negative'
+        else:
+            article['sentiment'] = 'Neutral'
     
     return news_data
 
-def visualize_sentiment(sentiment_results):
-    """
-    Create visualization of sentiment distribution
+def create_sentiment_visualizations(df):
+    """Create interactive visualizations for sentiment analysis"""
+    # Sentiment distribution
+    sentiment_counts = df['sentiment'].value_counts().reset_index()
+    sentiment_counts.columns = ['Sentiment', 'Count']
     
-    Parameters:
-    sentiment_results (list): List of dictionaries with sentiment analysis
+    color_map = {'Positive': '#4CAF50', 'Neutral': '#2196F3', 'Negative': '#F44336'}
     
-    Returns:
-    matplotlib.figure.Figure: Figure object with visualization
-    """
-    # Convert to DataFrame
-    df = pd.DataFrame(sentiment_results)
+    fig = px.bar(
+        sentiment_counts,
+        x='Sentiment',
+        y='Count',
+        title='Sentiment Distribution of News Headlines',
+        color='Sentiment',
+        color_discrete_map=color_map,
+        text='Count'
+    )
     
-    # Create figure and axes
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    # Count sentiments
-    sentiment_counts = df['sentiment'].value_counts()
-    
-    # Define colors for sentiment categories
-    colors = {'Positive': '#4CAF50', 'Neutral': '#2196F3', 'Negative': '#F44336'}
-    bar_colors = [colors[sentiment] for sentiment in sentiment_counts.index]
-    
-    # Create bar chart
-    sns.barplot(x=sentiment_counts.index, y=sentiment_counts.values, palette=bar_colors, ax=ax)
-    
-    # Add labels and title
-    ax.set_title('Sentiment Distribution of News Headlines', fontsize=16)
-    ax.set_xlabel('Sentiment Category', fontsize=12)
-    ax.set_ylabel('Number of Headlines', fontsize=12)
-    
-    # Add count labels on top of bars
-    for i, count in enumerate(sentiment_counts.values):
-        ax.text(i, count + 0.5, str(count), ha='center', fontsize=12)
-    
-    # Improve aesthetics
-    plt.tight_layout()
+    fig.update_layout(
+        xaxis_title='Sentiment Category',
+        yaxis_title='Number of Headlines',
+        plot_bgcolor='rgba(0,0,0,0)',
+        height=400
+    )
     
     return fig
