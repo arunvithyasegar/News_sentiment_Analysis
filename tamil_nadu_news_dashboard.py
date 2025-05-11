@@ -11,8 +11,6 @@ import pandas as pd
 import re
 from datetime import datetime, timedelta
 import time
-import nltk
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import plotly.express as px
 import plotly.graph_objects as go
 import feedparser
@@ -129,37 +127,65 @@ analyzes the sentiment of headlines, and visualizes the results.
 st.sidebar.image("https://media.licdn.com/dms/image/v2/D5603AQER_Q4BRk3EOA/profile-displayphoto-shrink_200_200/B56ZYla9dOHEAY-/0/1744384547325?e=1752710400&v=beta&t=xhakBODVDf_3tgyYKPTce-GLdWDtZoU5XcThT_rGzbY", width=100)
 st.sidebar.title("Dashboard Controls")
 
-# Download VADER lexicon if not already downloaded
-@st.cache_resource
-def download_nltk_resources():
-    try:
-        nltk.data.find('vader_lexicon')
-    except LookupError:
-        try:
-            nltk.download('vader_lexicon', quiet=True)
-        except Exception as e:
-            st.error(f"Failed to download VADER lexicon: {e}")
-            return False
-    return True
-
-# Initialize NLTK and VADER
-if not download_nltk_resources():
-    st.error("Could not initialize sentiment analysis. Please check your internet connection.")
-    st.stop()
-
-sid = SentimentIntensityAnalyzer()
-
-# Function to determine sentiment category
-def get_sentiment(text):
-    sentiment_scores = sid.polarity_scores(text)
-    compound_score = sentiment_scores['compound']
+# Try to import NLTK and VADER with proper error handling
+try:
+    import nltk
+    from nltk.sentiment.vader import SentimentIntensityAnalyzer
     
-    if compound_score >= 0.05:
-        return 'Positive'
-    elif compound_score <= -0.05:
-        return 'Negative'
-    else:
-        return 'Neutral'
+    # Download VADER lexicon if not already downloaded
+    @st.cache_resource
+    def download_nltk_resources():
+        try:
+            nltk.data.find('vader_lexicon')
+        except LookupError:
+            try:
+                nltk.download('vader_lexicon', quiet=True)
+            except Exception as e:
+                st.error(f"Failed to download VADER lexicon: {e}")
+                return False
+        return True
+    
+    # Initialize NLTK and VADER
+    if not download_nltk_resources():
+        st.error("Could not initialize sentiment analysis. Please check your internet connection.")
+        st.stop()
+    
+    sid = SentimentIntensityAnalyzer()
+    
+    # Function to determine sentiment category
+    def get_sentiment(text):
+        sentiment_scores = sid.polarity_scores(text)
+        compound_score = sentiment_scores['compound']
+        
+        if compound_score >= 0.05:
+            return 'Positive', compound_score
+        elif compound_score <= -0.05:
+            return 'Negative', compound_score
+        else:
+            return 'Neutral', compound_score
+    
+except ImportError:
+    st.error("NLTK is not installed. Using a simplified sentiment analysis approach.")
+    
+    # Fallback simple sentiment analysis function
+    def get_sentiment(text):
+        # Very simple sentiment analysis based on keywords
+        positive_words = ['good', 'great', 'excellent', 'positive', 'growth', 'increase', 'success', 'improve']
+        negative_words = ['bad', 'poor', 'negative', 'decline', 'decrease', 'fail', 'problem', 'issue', 'crisis']
+        
+        text_lower = text.lower()
+        
+        positive_count = sum(1 for word in positive_words if word in text_lower)
+        negative_count = sum(1 for word in negative_words if word in text_lower)
+        
+        if positive_count > negative_count:
+            score = 0.5  # Simple positive score
+            return 'Positive', score
+        elif negative_count > positive_count:
+            score = -0.5  # Simple negative score
+            return 'Negative', score
+        else:
+            return 'Neutral', 0.0
 
 # Function to extract country mentions (with special focus on Tamil Nadu districts)
 def extract_location(text):
@@ -213,12 +239,17 @@ def scrape_google_news(keywords, max_results=10):
                 # Extract location mentions
                 location = extract_location(entry.title)
                 
+                # Get sentiment
+                sentiment, sentiment_score = get_sentiment(entry.title)
+                
                 news_list.append({
                     'title': entry.title,
                     'url': entry.link,
                     'timestamp': pub_date.strftime('%Y-%m-%d %H:%M:%S'),
                     'source': 'Google News',
-                    'location': location
+                    'location': location,
+                    'sentiment': sentiment,
+                    'sentiment_score': sentiment_score
                 })
                 
         except Exception as e:
@@ -258,12 +289,17 @@ def get_news_from_newsapi(api_key, keywords, max_results=10):
                     if article.get('title') and article.get('link'):
                         location = extract_location(article['title'])
                         
+                        # Get sentiment
+                        sentiment, sentiment_score = get_sentiment(article['title'])
+                        
                         news_list.append({
                             'title': article['title'],
                             'url': article['link'],
                             'timestamp': article.get('pubDate', datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
                             'source': article.get('source_id', 'NewsAPI'),
-                            'location': location
+                            'location': location,
+                            'sentiment': sentiment,
+                            'sentiment_score': sentiment_score
                         })
             else:
                 st.warning(f"NewsAPI returned status code {response.status_code}")
@@ -296,15 +332,6 @@ def collect_and_analyze_news(api_key, search_areas):
     for news_item in all_news:
         if news_item['title'] not in unique_titles:
             unique_titles.add(news_item['title'])
-            
-            # Perform sentiment analysis
-            sentiment = get_sentiment(news_item['title'])
-            sentiment_score = sid.polarity_scores(news_item['title'])['compound']
-            
-            # Add sentiment data to news item
-            news_item['sentiment'] = sentiment
-            news_item['sentiment_score'] = sentiment_score
-            
             unique_news.append(news_item)
     
     # Create DataFrame
@@ -661,3 +688,7 @@ if st.session_state.news_df.empty:
     
     Select your industries of interest from the sidebar and click "Refresh Data" to begin!
     """)
+
+# Footer
+st.markdown("---")
+st.markdown("📰 Tamil Nadu News Sentiment Analysis Dashboard • Created with Streamlit")
