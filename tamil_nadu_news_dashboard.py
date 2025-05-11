@@ -37,7 +37,7 @@ analyzes the sentiment of headlines, and visualizes the results.
 """)
 
 # Create sidebar
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/8/81/TamilNadu_Logo.svg", width=100)
+st.sidebar.image("https://media.licdn.com/dms/image/v2/D5603AQER_Q4BRk3EOA/profile-displayphoto-shrink_200_200/B56ZYla9dOHEAY-/0/1744384547325?e=1752710400&v=beta&t=xhakBODVDf_3tgyYKPTce-GLdWDtZoU5XcThT_rGzbY", width=100)
 st.sidebar.title("Dashboard Controls")
 
 # Download VADER lexicon if not already downloaded
