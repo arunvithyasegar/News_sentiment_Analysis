@@ -1,19 +1,26 @@
+Here is the corrected and properly formatted version of your `README.md` file, including syntax highlighting, consistent structure, and fixed markdown rendering issues:
+
+---
+
+```markdown
 # News Sentiment Analysis – BIU Assignment (Part 2)
 
 This repository contains the implementation of **Part 2: Web Scraping & Sentiment Analysis** as part of the BIU Team assignment for **Guidance Tamil Nadu**.
 
-## Objective
+---
+
+## 🎯 Objective
 
 To extract and analyze recent news headlines related to the **electronics, semiconductors, and manufacturing** sectors using publicly accessible sources, and classify them by sentiment using Natural Language Processing (NLP) techniques.
 
 ---
 
-## Features
+## ✨ Features
 
 ### 🔍 Web Scraping
 
 - Utilized an RSS feed to legally collect 20 business news headlines.
-- Extracted:
+- Extracted the following from each article:
   - **Title**
   - **URL**
   - **Timestamp**
@@ -29,19 +36,18 @@ To extract and analyze recent news headlines related to the **electronics, semic
 
 ### 📊 Visualization
 
-- Bar chart displaying sentiment distribution.
-- Clean and intuitive dashboard created using **Streamlit**.
+- Bar chart showing sentiment distribution.
+- Interactive, professional dashboard created using **Streamlit**.
 
 ---
 
-## Live Dashboard
+## 🚀 Live Dashboard
 
-👉 **View the interactive news sentiment dashboard here**:  
-[https://newssentimentanalysis.streamlit.app/](https://newssentimentanalysis.streamlit.app/)
+👉 [Click here to view the interactive news sentiment dashboard](https://newssentimentanalysis.streamlit.app/)
 
 ---
 
-## Repository Structure
+## 📁 Repository Structure
 
 ```
 
@@ -57,28 +63,28 @@ News\_sentiment\_Analysis/
 
 ---
 
-## How to Run Locally
+## 🛠️ How to Run Locally
 
-1. Clone the repo:
+1. **Clone the repo**:
    ```bash
    git clone https://github.com/arunvithyasegar/News_sentiment_Analysis.git
    cd News_sentiment_Analysis
 ````
 
-2. Create a virtual environment (optional but recommended):
+2. **Create a virtual environment** (optional but recommended):
 
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. Install dependencies:
+3. **Install dependencies**:
 
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Run the notebook or launch the Streamlit app:
+4. **Run the notebook or launch the Streamlit app**:
 
    ```bash
    streamlit run news_sentiment_analysis.ipynb
@@ -86,27 +92,32 @@ News\_sentiment\_Analysis/
 
 ---
 
-## Tools Used
+## 🧰 Tools Used
 
 * **Python**
 * **Feedparser** – For RSS data extraction
 * **NLTK & VADER** – For sentiment analysis
-* **Pandas** – Data cleaning and manipulation
-* **Matplotlib/Seaborn** – Visualization
-* **Streamlit** – Dashboard interface
+* **Pandas** – Data wrangling
+* **Matplotlib / Seaborn** – Data visualization
+* **Streamlit** – Web app/dashboard development
 
 ---
 
-## License
+## 📄 License
 
-This project is created strictly for the **BIU Assignment at Guidance Tamil Nadu** and is not intended for commercial or large-scale use.
+This project is created strictly for the **BIU Assignment at Guidance Tamil Nadu** and is not intended for commercial or production use.
 
 ---
 
-## Author
+## 👨‍💻 Author
 
 **Arun Vithyasegar**
 [LinkedIn](https://www.linkedin.com/in/arunvithyasegar) | [GitHub](https://github.com/arunvithyasegar)
+
+---
+
+```
+
 
 
 
