@@ -1,5 +1,5 @@
 """
-Tamil Nadu News Sentiment Analysis
+Tamil Nadu News Sentiment Analysis (Ultra Light Version)
 This script scrapes news about Tamil Nadu's electronics, semiconductors, and manufacturing sectors,
 performs sentiment analysis, and visualizes the results.
 """
@@ -7,17 +7,13 @@ performs sentiment analysis, and visualizes the results.
 import streamlit as st
 import pandas as pd
 import feedparser
-import matplotlib.pyplot as plt
 from datetime import datetime
-import nltk
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import re
 
 # Set page configuration
 st.set_page_config(
     page_title="Tamil Nadu Industry News Sentiment",
-    page_icon="📰",
-    layout="wide"
+    page_icon="📰"
 )
 
 # Add title and description
@@ -27,60 +23,52 @@ This app scrapes the latest news about Tamil Nadu's electronics, semiconductors,
 performs sentiment analysis on headlines, and visualizes the sentiment distribution.
 """)
 
-# Download VADER lexicon if not already downloaded
-@st.cache_resource
-def download_nltk_resources():
-    try:
-        nltk.data.find('vader_lexicon')
-    except LookupError:
-        nltk.download('vader_lexicon', quiet=True)
-    return True
-
-# Initialize sentiment analyzer
-if download_nltk_resources():
-    sid = SentimentIntensityAnalyzer()
-else:
-    st.error("Could not initialize sentiment analysis. Please check your internet connection.")
-    st.stop()
-
-# Function to determine sentiment category
+# Very simple sentiment analysis function (no NLTK dependency)
 def get_sentiment(text):
-    sentiment_scores = sid.polarity_scores(text)
-    compound_score = sentiment_scores['compound']
+    # Define positive and negative word lists
+    positive_words = ['good', 'great', 'excellent', 'positive', 'growth', 'increase', 'success', 
+                     'improve', 'boost', 'up', 'investment', 'opportunity', 'benefit', 'support', 
+                     'win', 'lead', 'best', 'top', 'innovation', 'innovative', 'launch', 'expand']
     
-    if compound_score >= 0.05:
-        return 'Positive', compound_score
-    elif compound_score <= -0.05:
-        return 'Negative', compound_score
+    negative_words = ['bad', 'poor', 'negative', 'decline', 'decrease', 'fail', 'problem', 'issue', 
+                     'crisis', 'down', 'loss', 'drop', 'fall', 'risk', 'concern', 'against', 'protest', 
+                     'shortage', 'violation', 'warning', 'challenging', 'difficult', 'struggle']
+    
+    # Convert to lowercase for case-insensitive matching
+    text_lower = text.lower()
+    
+    # Count occurrences of positive and negative words
+    positive_count = sum(1 for word in positive_words if word in text_lower)
+    negative_count = sum(1 for word in negative_words if word in text_lower)
+    
+    # Calculate simple sentiment score
+    if positive_count > negative_count:
+        return 'Positive', (positive_count - negative_count) / (positive_count + negative_count + 1)
+    elif negative_count > positive_count:
+        return 'Negative', -((negative_count - positive_count) / (positive_count + negative_count + 1))
     else:
-        return 'Neutral', compound_score
+        return 'Neutral', 0.0
 
-# Function to extract country mentions (with special focus on Tamil Nadu districts)
+# Function to extract location mentions
 def extract_location(text):
-    # Tamil Nadu districts
-    tn_districts = [
-        'Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli',
-        'Tiruppur', 'Vellore', 'Erode', 'Thoothukkudi', 'Dindigul', 'Thanjavur'
-    ]
-    
-    # Check for Tamil Nadu districts
-    found_locations = []
     text_lower = text.lower()
     
     # Check for Tamil Nadu specifically
     if 'tamil nadu' in text_lower or 'tamilnadu' in text_lower:
-        found_locations.append('Tamil Nadu')
-    
-    # Check for districts
-    for district in tn_districts:
-        if district.lower() in text_lower:
-            found_locations.append(district)
-    
-    # If no specific district but India is mentioned
-    if not found_locations and ('india' in text_lower):
-        found_locations.append('India')
-    
-    return ', '.join(found_locations) if found_locations else 'Not specified'
+        return 'Tamil Nadu'
+    # Check for Chennai
+    elif 'chennai' in text_lower:
+        return 'Chennai'
+    # Check for other major TN cities
+    elif 'coimbatore' in text_lower:
+        return 'Coimbatore'
+    elif 'madurai' in text_lower:
+        return 'Madurai'
+    # If only India is mentioned
+    elif 'india' in text_lower:
+        return 'India'
+    else:
+        return 'Not specified'
 
 # Function to scrape Google News
 def scrape_google_news(keywords, max_results=20):
@@ -137,14 +125,14 @@ selected_industries = st.sidebar.multiselect(
     default=["electronics", "semiconductors", "manufacturing"]
 )
 
-# Convert selected industries to search terms
-search_terms = [f"{industry} Tamil Nadu" for industry in selected_industries]
-
 # Button to refresh data
 if st.sidebar.button("Fetch News Data") or 'news_df' not in st.session_state:
     if not selected_industries:
         st.warning("Please select at least one industry to track.")
     else:
+        # Convert selected industries to search terms
+        search_terms = [f"{industry} Tamil Nadu" for industry in selected_industries]
+        
         # Collect news from Google News
         all_news = []
         for term in search_terms:
@@ -182,48 +170,24 @@ if 'news_df' in st.session_state and not st.session_state.news_df.empty:
         sentiment_counts = st.session_state.news_df['sentiment'].value_counts().reset_index()
         sentiment_counts.columns = ['Sentiment', 'Count']
         
-        # Sort sentiment categories in a logical order
-        sentiment_order = ['Positive', 'Neutral', 'Negative']
-        sentiment_counts['Sentiment'] = pd.Categorical(
-            sentiment_counts['Sentiment'], 
-            categories=sentiment_order, 
-            ordered=True
-        )
-        sentiment_counts = sentiment_counts.sort_values('Sentiment')
+        # Display as a simple table
+        st.table(sentiment_counts)
         
-        # Define colors for sentiments
+        # Create a horizontal bar chart with native streamlit
+        sentiment_order = {'Positive': 0, 'Neutral': 1, 'Negative': 2}
+        sorted_counts = sentiment_counts.sort_values(by='Sentiment', key=lambda x: x.map(sentiment_order))
+        
         colors = {
             'Positive': '#4CAF50',
             'Neutral': '#2196F3',
             'Negative': '#F44336'
         }
         
-        # Create the bar chart
-        fig, ax = plt.subplots(figsize=(10, 6))
-        bars = ax.bar(
-            sentiment_counts['Sentiment'],
-            sentiment_counts['Count'],
-            color=[colors[s] for s in sentiment_counts['Sentiment']]
+        # Create the chart with streamlit's native chart function
+        st.bar_chart(
+            sorted_counts.set_index('Sentiment'),
+            use_container_width=True
         )
-        
-        # Add data labels on bars
-        for bar in bars:
-            height = bar.get_height()
-            ax.text(
-                bar.get_x() + bar.get_width()/2.,
-                height + 0.1,
-                f'{height:.0f}',
-                ha='center',
-                va='bottom'
-            )
-        
-        ax.set_xlabel('Sentiment', fontsize=12)
-        ax.set_ylabel('Number of Articles', fontsize=12)
-        ax.set_title('Sentiment Distribution of Tamil Nadu Industry News', fontsize=14)
-        ax.grid(axis='y', linestyle='--', alpha=0.7)
-        
-        # Show the plot
-        st.pyplot(fig)
 
         # Summary statistics
         st.subheader("Summary Statistics")
@@ -234,32 +198,19 @@ if 'news_df' in st.session_state and not st.session_state.news_df.empty:
         
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Total Articles", total_articles)
-        col2.metric("Positive Articles", positive_articles, f"{positive_articles/total_articles:.1%}")
-        col3.metric("Neutral Articles", neutral_articles, f"{neutral_articles/total_articles:.1%}")
-        col4.metric("Negative Articles", negative_articles, f"{negative_articles/total_articles:.1%}")
+        col2.metric("Positive", positive_articles, f"{positive_articles/total_articles:.1%}")
+        col3.metric("Neutral", neutral_articles, f"{neutral_articles/total_articles:.1%}")
+        col4.metric("Negative", negative_articles, f"{negative_articles/total_articles:.1%}")
         
         # Location mentions
         st.subheader("Locations Mentioned")
         
-        # Extract all locations mentioned
-        all_locations = []
-        for loc in st.session_state.news_df['location']:
-            if loc != 'Not specified':
-                all_locations.extend(loc.split(', '))
-        
-        # Count occurrences
-        location_counts = pd.Series(all_locations).value_counts()
+        # Count location occurrences
+        location_counts = st.session_state.news_df['location'].value_counts().reset_index()
+        location_counts.columns = ['Location', 'Count']
         
         if not location_counts.empty:
-            # Create a horizontal bar chart for locations
-            fig, ax = plt.subplots(figsize=(10, 6))
-            location_counts.head(10).plot(kind='barh', ax=ax)
-            ax.set_xlabel('Number of Mentions')
-            ax.set_ylabel('Location')
-            ax.set_title('Top Locations Mentioned in News')
-            ax.grid(axis='x', linestyle='--', alpha=0.7)
-            
-            st.pyplot(fig)
+            st.table(location_counts)
         else:
             st.info("No specific locations mentioned in the news headlines.")
     
@@ -290,22 +241,15 @@ if 'news_df' in st.session_state and not st.session_state.news_df.empty:
         elif sort_options == "Most Negative":
             filtered_df = filtered_df.sort_values('sentiment_score', ascending=True)
         
-        # Display news articles in a nice format
+        # Display news articles in a simple format
         for _, row in filtered_df.iterrows():
-            sentiment_color = {
-                'Positive': '#4CAF50',
-                'Neutral': '#2196F3',
-                'Negative': '#F44336'
-            }.get(row['sentiment'], '#000000')
-            
             st.markdown(f"""
-            <div style="padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 5px solid {sentiment_color}; background-color: #f5f5f5;">
-                <h4 style="margin-top: 0;">{row['title']}</h4>
-                <p><strong>Location:</strong> {row['location']} | <strong>Published:</strong> {row['timestamp']}</p>
-                <p><strong>Sentiment:</strong> <span style="color: {sentiment_color};">{row['sentiment']}</span> ({row['sentiment_score']:.2f})</p>
-                <a href="{row['url']}" target="_blank">Read Full Article</a>
-            </div>
-            """, unsafe_allow_html=True)
+            **{row['title']}**  
+            *Location:* {row['location']} | *Published:* {row['timestamp']}  
+            *Sentiment:* {row['sentiment']} ({row['sentiment_score']:.2f})  
+            [Read Full Article]({row['url']})
+            """)
+            st.markdown("---")
 
 else:
     # Display instructions if no data is present
