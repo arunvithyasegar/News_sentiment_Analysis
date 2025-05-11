@@ -8,7 +8,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from wordcloud import WordCloud
 from news_scraper import scrape_news
-from sentiment_analysis import analyze_sentiment, create_sentiment_visualizations, create_timeline_visualization
+from sentiment_analysis import analyze_sentiment, create_sentiment_visualizations
 
 # Set page configuration
 st.set_page_config(
@@ -178,7 +178,7 @@ elif page == "News Sentiment Analysis":
                     progress_bar.progress(100)
                     
                     # Display results in tabs
-                    tab1, tab2, tab3 = st.tabs(["Data Table", "Sentiment Distribution", "Timeline"])
+                    tab1, tab2 = st.tabs(["Data Table", "Sentiment Distribution"])
                     
                     with tab1:
                         # Display results
@@ -206,14 +206,6 @@ elif page == "News Sentiment Analysis":
                         # Create visualization
                         fig = create_sentiment_visualizations(results_df)
                         st.plotly_chart(fig, use_container_width=True)
-                    
-                    with tab3:
-                        st.markdown("<div class='section-header'>Sentiment Timeline</div>", unsafe_allow_html=True)
-                        timeline_fig = create_timeline_visualization(results_df)
-                        if timeline_fig:
-                            st.plotly_chart(timeline_fig, use_container_width=True)
-                        else:
-                            st.warning("Timeline could not be generated. Make sure your news data includes valid timestamps.")
             else:
                 # Simulate progress for better UX
                 for i in range(5):
@@ -232,7 +224,7 @@ elif page == "News Sentiment Analysis":
                         sentiment_results = analyze_sentiment(news_data)
                         
                         # Display results in tabs
-                        tab1, tab2, tab3 = st.tabs(["Data Table", "Sentiment Distribution", "Timeline"])
+                        tab1, tab2 = st.tabs(["Data Table", "Sentiment Distribution"])
                         
                         with tab1:
                             # Display results
@@ -269,14 +261,6 @@ elif page == "News Sentiment Analysis":
                                     title='News Source Distribution'
                                 )
                                 st.plotly_chart(source_fig, use_container_width=True)
-                        
-                        with tab3:
-                            st.markdown("<div class='section-header'>Sentiment Timeline</div>", unsafe_allow_html=True)
-                            timeline_fig = create_timeline_visualization(results_df)
-                            if timeline_fig:
-                                st.plotly_chart(timeline_fig, use_container_width=True)
-                            else:
-                                st.warning("Timeline could not be generated. Make sure your news data includes valid timestamps.")
                     else:
                         st.error("Failed to fetch news. Please try another source or check your internet connection.")
                 except Exception as e:
@@ -365,5 +349,63 @@ st.markdown("""
     <p>Submitted to: Guidance Tamil Nadu - BIU Team</p>
     <p>Assignment Part 2: Web Scraping & Sentiment Analysis</p>
     <p>© 2023 All Rights Reserved</p>
-</div>
+</div># Add this to your sentiment_analysis.py file
+def create_timeline_visualization(results_df):
+    # Convert timestamp to datetime if it's not already
+    if 'timestamp' in results_df.columns:
+        try:
+            # Sort by timestamp
+            time_df = results_df.copy()
+            time_df['date'] = pd.to_datetime(time_df['timestamp'])
+            time_df = time_df.sort_values('date')
+            
+            # Create timeline figure
+            fig = px.scatter(time_df, x='date', y='sentiment_score', 
+                           color='sentiment', size_max=10,
+                           hover_data=['title', 'source'],
+                           color_discrete_map={'Positive': '#4CAF50', 
+                                              'Neutral': '#2196F3', 
+                                              'Negative': '#F44336'})
+            
+            fig.update_layout(
+                title='News Sentiment Timeline',
+                xaxis_title='Publication Date',
+                yaxis_title='Sentiment Score',
+                hovermode='closest'
+            )
+            
+            return fig
+        except Exception as e:
+            print(f"Timeline creation error: {str(e)}")
+            return None
+    return None# Add this to your sentiment_analysis.py file
+def create_timeline_visualization(results_df):
+    # Convert timestamp to datetime if it's not already
+    if 'timestamp' in results_df.columns:
+        try:
+            # Sort by timestamp
+            time_df = results_df.copy()
+            time_df['date'] = pd.to_datetime(time_df['timestamp'])
+            time_df = time_df.sort_values('date')
+            
+            # Create timeline figure
+            fig = px.scatter(time_df, x='date', y='sentiment_score', 
+                           color='sentiment', size_max=10,
+                           hover_data=['title', 'source'],
+                           color_discrete_map={'Positive': '#4CAF50', 
+                                              'Neutral': '#2196F3', 
+                                              'Negative': '#F44336'})
+            
+            fig.update_layout(
+                title='News Sentiment Timeline',
+                xaxis_title='Publication Date',
+                yaxis_title='Sentiment Score',
+                hovermode='closest'
+            )
+            
+            return fig
+        except Exception as e:
+            print(f"Timeline creation error: {str(e)}")
+            return None
+    return None
 """, unsafe_allow_html=True)
