@@ -1,204 +1,66 @@
 """
-Tamil Nadu News Sentiment Analysis Dashboard
-This Streamlit app scrapes news about Tamil Nadu from various sources,
+Tamil Nadu News Sentiment Analysis
+This script scrapes news about Tamil Nadu's electronics, semiconductors, and manufacturing sectors,
 performs sentiment analysis, and visualizes the results.
 """
 
-# Import necessary libraries
 import streamlit as st
-import requests
 import pandas as pd
-import re
-from datetime import datetime, timedelta
-import time
-import plotly.express as px
-import plotly.graph_objects as go
 import feedparser
-import altair as alt
-from PIL import Image
-from io import BytesIO
+import matplotlib.pyplot as plt
+from datetime import datetime
+import nltk
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import re
 
 # Set page configuration
 st.set_page_config(
-    page_title="Tamil Nadu News Sentiment Dashboard",
+    page_title="Tamil Nadu Industry News Sentiment",
     page_icon="📰",
-    layout="wide",
-    initial_sidebar_state="expanded",
-    menu_items={
-        'About': "# Tamil Nadu News Sentiment Analysis\nCreated by Arun V"
-    }
+    layout="wide"
 )
 
-# Custom CSS for better styling
+# Add title and description
+st.title("📰 Tamil Nadu Industry News Sentiment Analysis")
 st.markdown("""
-<style>
-    .main-header {
-        font-size: 2.5rem;
-        color: #1E3A8A;
-        text-align: center;
-        margin-bottom: 1rem;
-        font-weight: bold;
-    }
-    .sub-header {
-        font-size: 1.8rem;
-        color: #2563EB;
-        margin-top: 2rem;
-        margin-bottom: 1rem;
-    }
-    .card {
-        background-color: #F3F4F6;
-        border-radius: 10px;
-        padding: 20px;
-        margin-bottom: 20px;
-        border: 1px solid #E5E7EB;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .metric-container {
-        display: flex;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    .metric-card {
-        background-color: white;
-        border-radius: 8px;
-        padding: 15px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        flex: 1;
-        min-width: 120px;
-        text-align: center;
-    }
-    .positive-text { color: #10B981; }
-    .neutral-text { color: #6B7280; }
-    .negative-text { color: #EF4444; }
-    .news-item {
-        padding: 10px;
-        border-radius: 5px;
-        margin-bottom: 10px;
-        border-left: 5px solid;
-    }
-    .news-item.positive { border-left-color: #10B981; background-color: #ECFDF5; }
-    .news-item.neutral { border-left-color: #6B7280; background-color: #F9FAFB; }
-    .news-item.negative { border-left-color: #EF4444; background-color: #FEF2F2; }
-    .source-tag {
-        display: inline-block;
-        padding: 3px 8px;
-        border-radius: 12px;
-        font-size: 0.7rem;
-        background-color: #E5E7EB;
-        margin-right: 5px;
-    }
-    .location-tag {
-        display: inline-block;
-        padding: 3px 8px;
-        border-radius: 12px;
-        font-size: 0.7rem;
-        background-color: #DBEAFE;
-        margin-right: 5px;
-    }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 24px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        white-space: pre-wrap;
-        background-color: transparent;
-        border-radius: 4px 4px 0 0;
-        gap: 1px;
-        padding-top: 10px;
-        padding-bottom: 10px;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #F3F4F6;
-        border-bottom: 2px solid #2563EB;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# App title and description
-st.markdown("<h1 class='main-header'>📰 Tamil Nadu News Sentiment Analysis Dashboard</h1>", unsafe_allow_html=True)
-
-st.markdown("""
-This dashboard scrapes the latest news about Tamil Nadu from various sources, 
-analyzes the sentiment of headlines, and visualizes the results.
+This app scrapes the latest news about Tamil Nadu's electronics, semiconductors, and manufacturing sectors,
+performs sentiment analysis on headlines, and visualizes the sentiment distribution.
 """)
 
-# Create sidebar
-st.sidebar.title("Dashboard Controls")
+# Download VADER lexicon if not already downloaded
+@st.cache_resource
+def download_nltk_resources():
+    try:
+        nltk.data.find('vader_lexicon')
+    except LookupError:
+        nltk.download('vader_lexicon', quiet=True)
+    return True
 
-# Use a placeholder image URL instead of a specific LinkedIn image
-sidebar_image_url = "https://via.placeholder.com/200x200.png?text=TN+Dashboard"
-st.sidebar.image(sidebar_image_url, width=100)
-
-# Try to import NLTK and VADER with proper error handling
-try:
-    import nltk
-    from nltk.sentiment.vader import SentimentIntensityAnalyzer
-    
-    # Download VADER lexicon if not already downloaded
-    @st.cache_resource
-    def download_nltk_resources():
-        try:
-            nltk.data.find('vader_lexicon')
-        except LookupError:
-            try:
-                nltk.download('vader_lexicon', quiet=True)
-            except Exception as e:
-                st.error(f"Failed to download VADER lexicon: {e}")
-                return False
-        return True
-    
-    # Initialize NLTK and VADER
-    if not download_nltk_resources():
-        st.error("Could not initialize sentiment analysis. Please check your internet connection.")
-        st.stop()
-    
+# Initialize sentiment analyzer
+if download_nltk_resources():
     sid = SentimentIntensityAnalyzer()
+else:
+    st.error("Could not initialize sentiment analysis. Please check your internet connection.")
+    st.stop()
+
+# Function to determine sentiment category
+def get_sentiment(text):
+    sentiment_scores = sid.polarity_scores(text)
+    compound_score = sentiment_scores['compound']
     
-    # Function to determine sentiment category
-    def get_sentiment(text):
-        sentiment_scores = sid.polarity_scores(text)
-        compound_score = sentiment_scores['compound']
-        
-        if compound_score >= 0.05:
-            return 'Positive', compound_score
-        elif compound_score <= -0.05:
-            return 'Negative', compound_score
-        else:
-            return 'Neutral', compound_score
-    
-except ImportError:
-    st.error("NLTK is not installed. Using a simplified sentiment analysis approach.")
-    
-    # Fallback simple sentiment analysis function
-    def get_sentiment(text):
-        # Very simple sentiment analysis based on keywords
-        positive_words = ['good', 'great', 'excellent', 'positive', 'growth', 'increase', 'success', 'improve']
-        negative_words = ['bad', 'poor', 'negative', 'decline', 'decrease', 'fail', 'problem', 'issue', 'crisis']
-        
-        text_lower = text.lower()
-        
-        positive_count = sum(1 for word in positive_words if word in text_lower)
-        negative_count = sum(1 for word in negative_words if word in text_lower)
-        
-        if positive_count > negative_count:
-            score = 0.5  # Simple positive score
-            return 'Positive', score
-        elif negative_count > positive_count:
-            score = -0.5  # Simple negative score
-            return 'Negative', score
-        else:
-            return 'Neutral', 0.0
+    if compound_score >= 0.05:
+        return 'Positive', compound_score
+    elif compound_score <= -0.05:
+        return 'Negative', compound_score
+    else:
+        return 'Neutral', compound_score
 
 # Function to extract country mentions (with special focus on Tamil Nadu districts)
 def extract_location(text):
     # Tamil Nadu districts
     tn_districts = [
         'Chennai', 'Coimbatore', 'Madurai', 'Tiruchirappalli', 'Salem', 'Tirunelveli',
-        'Tiruppur', 'Vellore', 'Erode', 'Thoothukkudi', 'Dindigul', 'Thanjavur',
-        'Ranipet', 'Sivakasi', 'Karur', 'Udhagamandalam', 'Hosur', 'Nagercoil',
-        'Kanchipuram', 'Kumarapalayam', 'Karaikkudi', 'Neyveli', 'Cuddalore',
-        'Kanyakumari', 'Nilgiris', 'Theni', 'Krishnagiri', 'Villupuram', 'Namakkal'
+        'Tiruppur', 'Vellore', 'Erode', 'Thoothukkudi', 'Dindigul', 'Thanjavur'
     ]
     
     # Check for Tamil Nadu districts
@@ -214,14 +76,14 @@ def extract_location(text):
         if district.lower() in text_lower:
             found_locations.append(district)
     
-    # If no specific district but Tamil Nadu is mentioned
+    # If no specific district but India is mentioned
     if not found_locations and ('india' in text_lower):
         found_locations.append('India')
     
     return ', '.join(found_locations) if found_locations else 'Not specified'
 
 # Function to scrape Google News
-def scrape_google_news(keywords, max_results=10):
+def scrape_google_news(keywords, max_results=20):
     news_list = []
     
     with st.spinner(f"Scraping Google News for {keywords}..."):
@@ -237,7 +99,7 @@ def scrape_google_news(keywords, max_results=10):
                 try:
                     pub_date = datetime.strptime(entry.published, '%a, %d %b %Y %H:%M:%S %Z')
                 except:
-                    pub_date = datetime.now() - timedelta(days=1)  # Default to yesterday
+                    pub_date = datetime.now()
                 
                 # Extract location mentions
                 location = extract_location(entry.title)
@@ -249,7 +111,6 @@ def scrape_google_news(keywords, max_results=10):
                     'title': entry.title,
                     'url': entry.link,
                     'timestamp': pub_date.strftime('%Y-%m-%d %H:%M:%S'),
-                    'source': 'Google News',
                     'location': location,
                     'sentiment': sentiment,
                     'sentiment_score': sentiment_score
@@ -260,205 +121,125 @@ def scrape_google_news(keywords, max_results=10):
     
     return news_list
 
-# Function to make safe HTTP requests
-def safe_request(url, timeout=10):
-    try:
-        response = requests.get(url, timeout=timeout)
-        response.raise_for_status()
-        return response
-    except requests.RequestException as e:
-        st.error(f"Error making request: {e}")
-        return None
-
-# Function to get news from NewsAPI
-def get_news_from_newsapi(api_key, keywords, max_results=10):
-    news_list = []
-    
-    with st.spinner("Fetching news from NewsAPI..."):
-        try:
-            # Prepare query with Tamil Nadu focus
-            query_terms = " OR ".join(keywords)
-            url = f'https://newsdata.io/api/1/news?apikey={api_key}&q=({query_terms}) AND (Tamil Nadu OR Chennai OR Coimbatore OR Madurai)&language=en'
-            
-            response = safe_request(url)
-            if response is None:
-                return []
-            
-            if response.status_code == 200:
-                data = response.json()
-                articles = data.get('results', [])
-                
-                for article in articles[:max_results]:
-                    if article.get('title') and article.get('link'):
-                        location = extract_location(article['title'])
-                        
-                        # Get sentiment
-                        sentiment, sentiment_score = get_sentiment(article['title'])
-                        
-                        news_list.append({
-                            'title': article['title'],
-                            'url': article['link'],
-                            'timestamp': article.get('pubDate', datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
-                            'source': article.get('source_id', 'NewsAPI'),
-                            'location': location,
-                            'sentiment': sentiment,
-                            'sentiment_score': sentiment_score
-                        })
-            else:
-                st.warning(f"NewsAPI returned status code {response.status_code}")
-                
-        except Exception as e:
-            st.error(f"Error fetching from NewsAPI: {e}")
-    
-    return news_list
-
-# Main function to collect and process news
-def collect_and_analyze_news(api_key, search_areas):
-    all_news = []
-    
-    # Tamil Nadu + search areas
-    search_keywords = [area + " Tamil Nadu" for area in search_areas]
-    
-    # Get news from Google News
-    google_results = scrape_google_news(search_keywords, max_results=15)
-    all_news.extend(google_results)
-    
-    # Get news from NewsAPI if API key is provided
-    if api_key:
-        newsapi_results = get_news_from_newsapi(api_key, search_areas, max_results=15)
-        all_news.extend(newsapi_results)
-    
-    # Remove duplicates and limit to 20 articles
-    unique_news = []
-    unique_titles = set()
-    
-    for news_item in all_news:
-        if news_item['title'] not in unique_titles:
-            unique_titles.add(news_item['title'])
-            unique_news.append(news_item)
-    
-    # Create DataFrame
-    if unique_news:
-        news_df = pd.DataFrame(unique_news)
-        if len(news_df) > 20:
-            news_df = news_df.head(20)  # Limit to 20 articles as required
-        return news_df
-    else:
-        return pd.DataFrame(columns=['title', 'url', 'timestamp', 'source', 'location', 'sentiment', 'sentiment_score'])
-
-# Add this after the news collection functions
-@st.cache_data(ttl=3600)  # Cache for 1 hour
-def get_cached_news(api_key, search_areas):
-    try:
-        df = collect_and_analyze_news(api_key, search_areas)
-        if df is not None and not df.empty:
-            return df
-        return pd.DataFrame(columns=['title', 'url', 'timestamp', 'source', 'location', 'sentiment', 'sentiment_score'])
-    except Exception as e:
-        st.error(f"Error collecting news: {e}")
-        return pd.DataFrame(columns=['title', 'url', 'timestamp', 'source', 'location', 'sentiment', 'sentiment_score'])
-
-# NewsAPI key input (with a default value for demo)
-api_key = st.sidebar.text_input("Enter NewsAPI Key", value="pub_86076086703c94c2637e240672a4a90a30ad9")
-
-# Industry selection
+# Define industry keywords
 industry_options = [
-    "electronics",
-    "semiconductors",
-    "manufacturing",
-    "technology",
-    "automotive",
-    "textiles",
-    "IT",
-    "renewable energy"
+    "electronics Tamil Nadu",
+    "semiconductors Tamil Nadu",
+    "manufacturing Tamil Nadu"
 ]
+
+# Sidebar for controls
+st.sidebar.title("Dashboard Controls")
 
 selected_industries = st.sidebar.multiselect(
     "Select Industries to Track",
-    options=industry_options,
+    options=["electronics", "semiconductors", "manufacturing"],
     default=["electronics", "semiconductors", "manufacturing"]
 )
 
+# Convert selected industries to search terms
+search_terms = [f"{industry} Tamil Nadu" for industry in selected_industries]
+
 # Button to refresh data
-if st.sidebar.button("Refresh Data"):
+if st.sidebar.button("Fetch News Data") or 'news_df' not in st.session_state:
     if not selected_industries:
         st.warning("Please select at least one industry to track.")
     else:
-        with st.spinner("Collecting and analyzing news..."):
-            try:
-                st.session_state.news_df = get_cached_news(api_key, selected_industries)
-                if st.session_state.news_df.empty:
-                    st.warning("No news articles found. Try different search terms or check your API key.")
-            except Exception as e:
-                st.error(f"Error refreshing data: {e}")
-
-# Initialize session state for news_df if it doesn't exist
-if 'news_df' not in st.session_state:
-    st.session_state.news_df = pd.DataFrame(columns=['title', 'url', 'timestamp', 'source', 'location', 'sentiment', 'sentiment_score'])
+        # Collect news from Google News
+        all_news = []
+        for term in search_terms:
+            news = scrape_google_news([term], max_results=7)  # Get ~7 per category to reach ~20 total
+            all_news.extend(news)
+            
+        # Remove duplicates and limit to 20 articles
+        unique_news = []
+        unique_titles = set()
+        
+        for news_item in all_news:
+            if news_item['title'] not in unique_titles:
+                unique_titles.add(news_item['title'])
+                unique_news.append(news_item)
+        
+        # Create DataFrame
+        if unique_news:
+            news_df = pd.DataFrame(unique_news)
+            if len(news_df) > 20:
+                news_df = news_df.head(20)  # Limit to 20 articles as required
+            st.session_state.news_df = news_df
+        else:
+            st.session_state.news_df = pd.DataFrame(columns=['title', 'url', 'timestamp', 'location', 'sentiment', 'sentiment_score'])
+            st.warning("No news articles found. Try different search terms.")
 
 # Display the dashboard if we have data
-if not st.session_state.news_df.empty:
+if 'news_df' in st.session_state and not st.session_state.news_df.empty:
     # Create tabs for different visualizations
-    tab1, tab2, tab3 = st.tabs(["📈 Overview", "📊 Detailed Analysis", "📰 News Articles"])
+    tab1, tab2 = st.tabs(["📊 Sentiment Analysis", "📰 News Articles"])
     
     with tab1:
-        st.header("News Sentiment Overview")
+        st.header("News Sentiment Distribution")
         
-        # Create two columns for visualizations
-        col1, col2 = st.columns(2)
+        # Sentiment distribution chart
+        sentiment_counts = st.session_state.news_df['sentiment'].value_counts().reset_index()
+        sentiment_counts.columns = ['Sentiment', 'Count']
         
-        with col1:
-            # Sentiment distribution chart
-            sentiment_counts = st.session_state.news_df['sentiment'].value_counts().reset_index()
-            sentiment_counts.columns = ['Sentiment', 'Count']
-            
-            # Define colors for sentiments
-            colors = {
-                'Positive': '#4CAF50',
-                'Neutral': '#2196F3',
-                'Negative': '#F44336'
-            }
-            
-            # Create bar chart
-            fig = px.bar(
-                sentiment_counts,
-                x='Sentiment',
-                y='Count',
-                title='Sentiment Distribution',
-                color='Sentiment',
-                color_discrete_map=colors,
-                text='Count'
+        # Sort sentiment categories in a logical order
+        sentiment_order = ['Positive', 'Neutral', 'Negative']
+        sentiment_counts['Sentiment'] = pd.Categorical(
+            sentiment_counts['Sentiment'], 
+            categories=sentiment_order, 
+            ordered=True
+        )
+        sentiment_counts = sentiment_counts.sort_values('Sentiment')
+        
+        # Define colors for sentiments
+        colors = {
+            'Positive': '#4CAF50',
+            'Neutral': '#2196F3',
+            'Negative': '#F44336'
+        }
+        
+        # Create the bar chart
+        fig, ax = plt.subplots(figsize=(10, 6))
+        bars = ax.bar(
+            sentiment_counts['Sentiment'],
+            sentiment_counts['Count'],
+            color=[colors[s] for s in sentiment_counts['Sentiment']]
+        )
+        
+        # Add data labels on bars
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(
+                bar.get_x() + bar.get_width()/2.,
+                height + 0.1,
+                f'{height:.0f}',
+                ha='center',
+                va='bottom'
             )
-            
-            fig.update_layout(
-                xaxis_title='Sentiment',
-                yaxis_title='Number of Articles',
-                plot_bgcolor='rgba(0,0,0,0)'
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
-        with col2:
-            # Source distribution pie chart
-            source_counts = st.session_state.news_df['source'].value_counts().reset_index()
-            source_counts.columns = ['Source', 'Count']
-            
-            fig2 = px.pie(
-                source_counts,
-                names='Source',
-                values='Count',
-                title='News Sources',
-                hole=0.4
-            )
-            
-            fig2.update_layout(
-                plot_bgcolor='rgba(0,0,0,0)'
-            )
-            
-            st.plotly_chart(fig2, use_container_width=True)
+        
+        ax.set_xlabel('Sentiment', fontsize=12)
+        ax.set_ylabel('Number of Articles', fontsize=12)
+        ax.set_title('Sentiment Distribution of Tamil Nadu Industry News', fontsize=14)
+        ax.grid(axis='y', linestyle='--', alpha=0.7)
+        
+        # Show the plot
+        st.pyplot(fig)
+
+        # Summary statistics
+        st.subheader("Summary Statistics")
+        total_articles = len(st.session_state.news_df)
+        positive_articles = sum(st.session_state.news_df['sentiment'] == 'Positive')
+        neutral_articles = sum(st.session_state.news_df['sentiment'] == 'Neutral')
+        negative_articles = sum(st.session_state.news_df['sentiment'] == 'Negative')
+        
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Total Articles", total_articles)
+        col2.metric("Positive Articles", positive_articles, f"{positive_articles/total_articles:.1%}")
+        col3.metric("Neutral Articles", neutral_articles, f"{neutral_articles/total_articles:.1%}")
+        col4.metric("Negative Articles", negative_articles, f"{negative_articles/total_articles:.1%}")
         
         # Location mentions
-        st.subheader("Location Mentions")
+        st.subheader("Locations Mentioned")
         
         # Extract all locations mentioned
         all_locations = []
@@ -467,124 +248,22 @@ if not st.session_state.news_df.empty:
                 all_locations.extend(loc.split(', '))
         
         # Count occurrences
-        location_counts = pd.Series(all_locations).value_counts().reset_index()
-        location_counts.columns = ['Location', 'Mentions']
+        location_counts = pd.Series(all_locations).value_counts()
         
         if not location_counts.empty:
-            # Create horizontal bar chart for locations
-            fig3 = px.bar(
-                location_counts.head(10),  # Top 10 locations
-                y='Location',
-                x='Mentions',
-                title='Top Locations Mentioned',
-                orientation='h',
-                color='Mentions',
-                color_continuous_scale=px.colors.sequential.Viridis
-            )
+            # Create a horizontal bar chart for locations
+            fig, ax = plt.subplots(figsize=(10, 6))
+            location_counts.head(10).plot(kind='barh', ax=ax)
+            ax.set_xlabel('Number of Mentions')
+            ax.set_ylabel('Location')
+            ax.set_title('Top Locations Mentioned in News')
+            ax.grid(axis='x', linestyle='--', alpha=0.7)
             
-            fig3.update_layout(
-                yaxis={'categoryorder':'total ascending'},
-                plot_bgcolor='rgba(0,0,0,0)'
-            )
-            
-            st.plotly_chart(fig3, use_container_width=True)
+            st.pyplot(fig)
         else:
             st.info("No specific locations mentioned in the news headlines.")
     
     with tab2:
-        st.header("Detailed Sentiment Analysis")
-        
-        # Sentiment over time
-        st.session_state.news_df['date'] = pd.to_datetime(st.session_state.news_df['timestamp'])
-        st.session_state.news_df = st.session_state.news_df.sort_values('date')
-        
-        # Create a line chart of sentiment scores over time
-        fig4 = px.line(
-            st.session_state.news_df,
-            x='date',
-            y='sentiment_score',
-            title='Sentiment Trend Over Time',
-            markers=True
-        )
-        
-        fig4.update_layout(
-            xaxis_title='Date',
-            yaxis_title='Sentiment Score',
-            yaxis=dict(range=[-1, 1]),
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
-        
-        # Add horizontal lines for sentiment boundaries
-        fig4.add_shape(
-            type="line",
-            x0=st.session_state.news_df['date'].min(),
-            y0=0.05,
-            x1=st.session_state.news_df['date'].max(),
-            y1=0.05,
-            line=dict(color="green", width=1, dash="dash"),
-        )
-        
-        fig4.add_shape(
-            type="line",
-            x0=st.session_state.news_df['date'].min(),
-            y0=-0.05,
-            x1=st.session_state.news_df['date'].max(),
-            y1=-0.05,
-            line=dict(color="red", width=1, dash="dash"),
-        )
-        
-        st.plotly_chart(fig4, use_container_width=True)
-        
-        # Industry-specific analysis
-        st.subheader("Industry-Specific Analysis")
-        
-        industry_sentiments = {}
-        for industry in selected_industries:
-            # Filter headlines that mention this industry
-            industry_news = st.session_state.news_df[st.session_state.news_df['title'].str.contains(industry, case=False)]
-            
-            if not industry_news.empty:
-                positive = sum(industry_news['sentiment'] == 'Positive')
-                neutral = sum(industry_news['sentiment'] == 'Neutral')
-                negative = sum(industry_news['sentiment'] == 'Negative')
-                avg_score = industry_news['sentiment_score'].mean()
-                
-                industry_sentiments[industry] = {
-                    'positive': positive,
-                    'neutral': neutral,
-                    'negative': negative,
-                    'total': len(industry_news),
-                    'avg_score': avg_score
-                }
-        
-        if industry_sentiments:
-            # Convert to DataFrame for visualization
-            industry_df = pd.DataFrame([
-                {'Industry': ind, 'Avg. Sentiment': data['avg_score'], 'Articles': data['total']}
-                for ind, data in industry_sentiments.items()
-            ])
-            
-            # Create industry sentiment comparison
-            fig5 = px.bar(
-                industry_df,
-                x='Industry',
-                y='Avg. Sentiment',
-                title='Average Sentiment by Industry',
-                color='Avg. Sentiment',
-                size='Articles',
-                color_continuous_scale=px.colors.diverging.RdBu,
-                color_continuous_midpoint=0
-            )
-            
-            fig5.update_layout(
-                xaxis_title='Industry',
-                yaxis_title='Average Sentiment Score',
-                plot_bgcolor='rgba(0,0,0,0)'
-            )
-            
-            st.plotly_chart(fig5, use_container_width=True)
-            
-    with tab3:
         st.header("News Articles")
         
         # Add sentiment filters
@@ -605,94 +284,52 @@ if not st.session_state.news_df.empty:
         )
         
         if sort_options == "Newest First":
-            filtered_df = filtered_df.sort_values('date', ascending=False)
+            filtered_df = filtered_df.sort_values('timestamp', ascending=False)
         elif sort_options == "Most Positive":
             filtered_df = filtered_df.sort_values('sentiment_score', ascending=False)
         elif sort_options == "Most Negative":
             filtered_df = filtered_df.sort_values('sentiment_score', ascending=True)
         
-        # Display news articles
-        def display_news_item(row):
-            sentiment_colors = {
-                'Positive': '#ECFDF5',
-                'Neutral': '#F9FAFB',
-                'Negative': '#FEF2F2'
-            }
-            border_colors = {
-                'Positive': '#10B981',
-                'Neutral': '#6B7280',
-                'Negative': '#EF4444'
-            }
-            
-            bg_color = sentiment_colors.get(row['sentiment'], '#F9FAFB')
-            border_color = border_colors.get(row['sentiment'], '#6B7280')
+        # Display news articles in a nice format
+        for _, row in filtered_df.iterrows():
+            sentiment_color = {
+                'Positive': '#4CAF50',
+                'Neutral': '#2196F3',
+                'Negative': '#F44336'
+            }.get(row['sentiment'], '#000000')
             
             st.markdown(f"""
-            <div style="padding:15px; border-radius:5px; margin-bottom:10px; 
-                        background-color:{bg_color}; border-left:5px solid {border_color};">
-                <h4 style="margin-top:0;">{row['title']}</h4>
-                <p>
-                    <span class='source-tag'>{row['source']}</span>
-                    <span class='location-tag'>{row['location']}</span>
-                    <span>{row['timestamp']}</span>
-                </p>
+            <div style="padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 5px solid {sentiment_color}; background-color: #f5f5f5;">
+                <h4 style="margin-top: 0;">{row['title']}</h4>
+                <p><strong>Location:</strong> {row['location']} | <strong>Published:</strong> {row['timestamp']}</p>
+                <p><strong>Sentiment:</strong> <span style="color: {sentiment_color};">{row['sentiment']}</span> ({row['sentiment_score']:.2f})</p>
                 <a href="{row['url']}" target="_blank">Read Full Article</a>
             </div>
             """, unsafe_allow_html=True)
-        
-        if not filtered_df.empty:
-            for _, row in filtered_df.iterrows():
-                display_news_item(row)
-        else:
-            st.info("No news articles found. Try adjusting your search terms or refreshing the data.")
 
-# Add Tamil Nadu investment context at the bottom of sidebar
-st.sidebar.markdown("---")
-st.sidebar.subheader("Tamil Nadu Industry Context")
-st.sidebar.info("""
-Tamil Nadu is a major industrial hub in India with significant investments in:
-
-- Electronics manufacturing
-- Automobile production
-- Textiles and garments
-- Information Technology
-- Renewable energy
-
-The state has attracted major semiconductor and electronics companies for investments.
-""")
-
-# Add instructions for first-time visitors
-if st.session_state.news_df.empty:
-    st.info("👈 Please select industries from the sidebar and click 'Refresh Data' to get started!")
+else:
+    # Display instructions if no data is present
+    st.info("👈 Please select industries from the sidebar and click 'Fetch News Data' to get started!")
     
-    # Use a placeholder image URL instead of the Wikipedia image
-    tn_map_url = "https://via.placeholder.com/800x600.png?text=Tamil+Nadu+Map"
-    st.image(tn_map_url, caption="Tamil Nadu State Map")
-    
-    # Add introduction text
     st.markdown("""
     ## About This Dashboard
     
     This dashboard helps you track and analyze news related to Tamil Nadu's industrial sectors with a focus on sentiment analysis.
     
     ### Features:
-    - Scrapes latest news from multiple sources
+    - Scrapes latest news from Google News RSS feed
     - Analyzes sentiment of headlines (Positive, Neutral, Negative)
     - Identifies locations mentioned in the news
-    - Tracks sentiment trends over time
-    - Provides industry-specific sentiment analysis
+    - Visualizes sentiment distribution
     
     ### Industries Covered:
-    - Electronics and Semiconductors
+    - Electronics
+    - Semiconductors
     - Manufacturing
-    - Technology and IT
-    - Automotive
-    - Textiles
-    - Renewable Energy
     
-    Select your industries of interest from the sidebar and click "Refresh Data" to begin!
+    Select your industries of interest from the sidebar and click "Fetch News Data" to begin!
     """)
 
 # Footer
 st.markdown("---")
-st.markdown("📰 Tamil Nadu News Sentiment Analysis Dashboard • Created with Streamlit")
+st.markdown("📰 Tamil Nadu Industry News Sentiment Analysis | Created with Streamlit")
