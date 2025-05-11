@@ -110,8 +110,10 @@ elif page == "News Sentiment Analysis":
         value=20
     )
     
-    # Button to fetch and analyze news
-    if st.button("Fetch and Analyze News"):
+    # Button to fetch and analyze news - ADD A UNIQUE KEY HERE
+    fetch_button = st.button("Fetch and Analyze News", key="fetch_analyze_button")
+    
+    if fetch_button:
         with st.spinner("Fetching news and analyzing sentiment..."):
             # Scrape news based on selected source
             if news_source == "Manual Input":
@@ -184,8 +186,9 @@ elif page == "News Sentiment Analysis":
                 else:
                     st.error("Failed to fetch news. Please try another source or check your internet connection.")
     
-    # Sample data for demonstration
-    if not st.button("Fetch and Analyze News"):
+    # Sample data for demonstration - CHANGE THIS CONDITION AND ADD A UNIQUE KEY
+    # Instead of checking the button again, use a separate variable
+    if not fetch_button:
         st.info("Click the button above to fetch and analyze news headlines.")
         
         st.markdown("<div class='section-header'>Sample Sentiment Analysis</div>", unsafe_allow_html=True)
