@@ -8,7 +8,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from wordcloud import WordCloud
 from news_scraper import scrape_news
-from sentiment_analysis import analyze_sentiment, create_sentiment_visualizations
+from sentiment_analysis import analyze_sentiment, create_sentiment_visualizations, create_timeline_visualization
 
 # Set page configuration
 st.set_page_config(
@@ -178,7 +178,7 @@ elif page == "News Sentiment Analysis":
                     progress_bar.progress(100)
                     
                     # Display results in tabs
-                    tab1, tab2 = st.tabs(["Data Table", "Sentiment Distribution"])
+                    tab1, tab2, tab3 = st.tabs(["Data Table", "Sentiment Distribution", "Timeline"])
                     
                     with tab1:
                         # Display results
@@ -206,6 +206,14 @@ elif page == "News Sentiment Analysis":
                         # Create visualization
                         fig = create_sentiment_visualizations(results_df)
                         st.plotly_chart(fig, use_container_width=True)
+                    
+                    with tab3:
+                        st.markdown("<div class='section-header'>Sentiment Timeline</div>", unsafe_allow_html=True)
+                        timeline_fig = create_timeline_visualization(results_df)
+                        if timeline_fig:
+                            st.plotly_chart(timeline_fig, use_container_width=True)
+                        else:
+                            st.warning("Timeline could not be generated. Make sure your news data includes valid timestamps.")
             else:
                 # Simulate progress for better UX
                 for i in range(5):
@@ -224,7 +232,7 @@ elif page == "News Sentiment Analysis":
                         sentiment_results = analyze_sentiment(news_data)
                         
                         # Display results in tabs
-                        tab1, tab2 = st.tabs(["Data Table", "Sentiment Distribution"])
+                        tab1, tab2, tab3 = st.tabs(["Data Table", "Sentiment Distribution", "Timeline"])
                         
                         with tab1:
                             # Display results
@@ -261,6 +269,14 @@ elif page == "News Sentiment Analysis":
                                     title='News Source Distribution'
                                 )
                                 st.plotly_chart(source_fig, use_container_width=True)
+                        
+                        with tab3:
+                            st.markdown("<div class='section-header'>Sentiment Timeline</div>", unsafe_allow_html=True)
+                            timeline_fig = create_timeline_visualization(results_df)
+                            if timeline_fig:
+                                st.plotly_chart(timeline_fig, use_container_width=True)
+                            else:
+                                st.warning("Timeline could not be generated. Make sure your news data includes valid timestamps.")
                     else:
                         st.error("Failed to fetch news. Please try another source or check your internet connection.")
                 except Exception as e:
