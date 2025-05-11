@@ -73,13 +73,13 @@ page = st.sidebar.radio(
 
 # Home Page
 if page == "Home":
-    st.markdown("<div class='sub-header'>Welcome to the Dashboard</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sub-header'>Welcome to the Real-Time News Dashboard</div>", unsafe_allow_html=True)
     
     st.markdown("""
     <div class='highlight'>
-    This interactive dashboard provides analysis for:
+    This interactive dashboard provides real-time analysis for:
     <ul>
-        <li><b>News Sentiment Analysis</b>: Analyzing sentiment of recent news headlines related to electronics, semiconductors, or manufacturing</li>
+        <li><b>Live News Sentiment Analysis</b>: Real-time sentiment analysis of latest news headlines related to electronics, semiconductors, or manufacturing</li>
     </ul>
     </div>
     """, unsafe_allow_html=True)
@@ -88,20 +88,28 @@ if page == "Home":
     st.markdown("""
     - Use the sidebar to navigate to the News Sentiment Analysis section
     - In the News Sentiment Analysis section, you can:
-        - View scraped news headlines
-        - See sentiment analysis results
-        - Explore sentiment distribution visualizations
+        - View live news headlines as they are published
+        - Get instant sentiment analysis results
+        - See real-time sentiment distribution visualizations
+        - Set up auto-refresh intervals
     """)
     
     # Sample visualization for the home page
-    st.markdown("<div class='section-header'>Dashboard Preview</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-header'>Live Dashboard Preview</div>", unsafe_allow_html=True)
     
     st.image("https://miro.medium.com/max/1400/1*Uu0RqBu1CgEfSLUzQEFIHw.png", 
-             caption="Sentiment Analysis Visualization")
+             caption="Real-Time Sentiment Analysis Visualization")
 
 # News Sentiment Analysis Page
 elif page == "News Sentiment Analysis":
-    st.markdown("<div class='sub-header'>News Sentiment Analysis</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sub-header'>Real-Time News Sentiment Analysis</div>", unsafe_allow_html=True)
+    
+    # Auto-refresh settings
+    refresh_interval = st.selectbox(
+        "Auto-refresh interval",
+        ["Off", "30 seconds", "1 minute", "5 minutes", "15 minutes"],
+        help="Select how often to automatically fetch new headlines"
+    )
     
     # Options for news sources
     news_source = st.selectbox(
@@ -117,23 +125,31 @@ elif page == "News Sentiment Analysis":
     
     # Number of articles to fetch
     num_articles = st.slider(
-        "Number of articles to analyze",
+        "Number of latest articles to analyze",
         min_value=5,
-        max_value=50,
+        max_value=100,
         value=20
     )
     
     # Create a progress bar placeholder
     progress_bar = st.empty()
     
-    # Button to fetch and analyze news
-    fetch_button = st.button("Fetch and Analyze News", key="fetch_analyze_button")
+    # Last updated timestamp
+    last_updated = st.empty()
     
-    if fetch_button:
+    # Button to fetch and analyze news
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        fetch_button = st.button("Fetch Latest News", key="fetch_analyze_button")
+    with col2:
+        if refresh_interval != "Off":
+            st.info(f"Auto-refreshing every {refresh_interval}")
+    
+    if fetch_button or refresh_interval != "Off":
         # Initialize progress bar
         progress_bar = st.progress(0)
         
-        with st.spinner("Fetching news and analyzing sentiment..."):
+        with st.spinner("Fetching latest news and analyzing sentiment..."):
             # Scrape news based on selected source
             if news_source == "Manual Input":
                 st.markdown("<div class='section-header'>Enter News Headlines Manually</div>", unsafe_allow_html=True)
