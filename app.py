@@ -194,16 +194,12 @@ elif page == "News Sentiment Analysis":
                     progress_bar.progress(100)
                     
                     # Display results in tabs
-                    tab1, tab2 = st.tabs(["Data Table", "Sentiment Distribution"])
+                    tab1, tab2, tab3 = st.tabs(["Data Table", "Sentiment Distribution", "Source Analysis"])
                     
                     with tab1:
-                        # Display results
+                        # Display results dataframe
                         st.markdown("<div class='section-header'>News Headlines with Sentiment</div>", unsafe_allow_html=True)
-                        
-                        # Create a DataFrame for display
                         results_df = pd.DataFrame(sentiment_results)
-                        
-                        # Display the dataframe
                         st.dataframe(results_df, use_container_width=True)
                         
                         # Add download button
@@ -216,12 +212,23 @@ elif page == "News Sentiment Analysis":
                         )
                     
                     with tab2:
-                        # Visualize sentiment distribution
-                        st.markdown("<div class='section-header'>Sentiment Distribution</div>", unsafe_allow_html=True)
-                        
-                        # Create visualization
+                        st.markdown("<div class='section-header'>Sentiment Analysis</div>", unsafe_allow_html=True)
+                        # Create and display sentiment visualization
                         fig = create_sentiment_visualizations(results_df)
-                        st.plotly_chart(fig, use_container_width=True)
+                        if fig is not None:
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.error("Could not create sentiment visualization.")
+                            
+                    with tab3:
+                        st.markdown("<div class='section-header'>Source Distribution</div>", unsafe_allow_html=True)
+                        if 'source' in results_df.columns:
+                            source_fig = px.pie(
+                                results_df, 
+                                names='source',
+                                title='Distribution by News Source'
+                            )
+                            st.plotly_chart(source_fig, use_container_width=True)
             else:
                 # Simulate progress for better UX
                 for i in range(5):
@@ -240,16 +247,12 @@ elif page == "News Sentiment Analysis":
                         sentiment_results = analyze_sentiment(news_data)
                         
                         # Display results in tabs
-                        tab1, tab2 = st.tabs(["Data Table", "Sentiment Distribution"])
+                        tab1, tab2, tab3 = st.tabs(["Data Table", "Sentiment Distribution", "Source Analysis"])
                         
                         with tab1:
-                            # Display results
+                            # Display results dataframe
                             st.markdown("<div class='section-header'>News Headlines with Sentiment</div>", unsafe_allow_html=True)
-                            
-                            # Create a DataFrame for display
                             results_df = pd.DataFrame(sentiment_results)
-                            
-                            # Display the dataframe
                             st.dataframe(results_df, use_container_width=True)
                             
                             # Add download button
@@ -262,19 +265,21 @@ elif page == "News Sentiment Analysis":
                             )
                         
                         with tab2:
-                            # Visualize sentiment distribution
-                            st.markdown("<div class='section-header'>Sentiment Distribution</div>", unsafe_allow_html=True)
-                            
-                            # Create visualization
+                            st.markdown("<div class='section-header'>Sentiment Analysis</div>", unsafe_allow_html=True)
+                            # Create and display sentiment visualization
                             fig = create_sentiment_visualizations(results_df)
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            # Source distribution
+                            if fig is not None:
+                                st.plotly_chart(fig, use_container_width=True)
+                            else:
+                                st.error("Could not create sentiment visualization.")
+                                
+                        with tab3:
+                            st.markdown("<div class='section-header'>Source Distribution</div>", unsafe_allow_html=True)
                             if 'source' in results_df.columns:
                                 source_fig = px.pie(
-                                    results_df,
+                                    results_df, 
                                     names='source',
-                                    title='News Source Distribution'
+                                    title='Distribution by News Source'
                                 )
                                 st.plotly_chart(source_fig, use_container_width=True)
                     else:

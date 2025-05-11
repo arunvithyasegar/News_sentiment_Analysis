@@ -24,30 +24,47 @@ def analyze_sentiment(news_data):
     return news_data
 
 def create_sentiment_visualizations(df):
-    """Create sentiment distribution visualization"""
-    sentiment_counts = df['sentiment'].value_counts().reset_index()
-    sentiment_counts.columns = ['Sentiment', 'Count']
-    
-    color_map = {'Positive': '#4CAF50', 'Neutral': '#2196F3', 'Negative': '#F44336'}
-    
-    fig = px.bar(
-        sentiment_counts,
-        x='Sentiment',
-        y='Count',
-        title='Sentiment Distribution of News Headlines',
-        color='Sentiment',
-        color_discrete_map=color_map,
-        text='Count'
-    )
-    
-    fig.update_layout(
-        xaxis_title='Sentiment Category',
-        yaxis_title='Number of Headlines',
-        plot_bgcolor='rgba(0,0,0,0)',
-        height=400
-    )
-    
-    return fig
+    """Create interactive visualizations for sentiment analysis"""
+    try:
+        # Ensure we have sentiment data
+        if 'sentiment' not in df.columns:
+            return None
+            
+        # Calculate sentiment counts
+        sentiment_counts = df['sentiment'].value_counts().reset_index()
+        sentiment_counts.columns = ['Sentiment', 'Count']
+        
+        # Define consistent colors
+        color_map = {'Positive': '#4CAF50', 'Neutral': '#2196F3', 'Negative': '#F44336'}
+        
+        # Create figure with both bar chart and pie chart
+        fig = px.bar(
+            sentiment_counts,
+            x='Sentiment',
+            y='Count',
+            color='Sentiment',
+            color_discrete_map=color_map,
+            title='Sentiment Distribution'
+        )
+        
+        # Update layout for better visibility
+        fig.update_layout(
+            showlegend=True,
+            xaxis_title="Sentiment Category",
+            yaxis_title="Number of Articles",
+            plot_bgcolor='white',
+            height=400,
+            margin=dict(l=20, r=20, t=40, b=20),
+            title_x=0.5
+        )
+        
+        # Add value labels on bars
+        fig.update_traces(texttemplate='%{y}', textposition='outside')
+        
+        return fig
+    except Exception as e:
+        print(f"Error creating visualization: {str(e)}")
+        return None
 
 def create_timeline_visualization(results_df):
     """Create timeline visualization of sentiment scores"""
