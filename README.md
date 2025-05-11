@@ -1,8 +1,3 @@
-Here’s the polished and stylistically aligned version of the **Part 2 – News Sentiment Analysis** `README.md`, formatted to match the structure and tone of Part 1:
-
----
-
-```markdown
 # 🗞️ News Sentiment Analysis – BIU Assignment (Part 2)
 
 This repository contains the implementation of **Part 2: Web Scraping & Sentiment Analysis** as part of the **BIU Team assignment for Guidance Tamil Nadu**.
