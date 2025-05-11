@@ -124,8 +124,11 @@ analyzes the sentiment of headlines, and visualizes the results.
 """)
 
 # Create sidebar
-st.sidebar.image("https://media.licdn.com/dms/image/v2/D5603AQER_Q4BRk3EOA/profile-displayphoto-shrink_200_200/B56ZYla9dOHEAY-/0/1744384547325?e=1752710400&v=beta&t=xhakBODVDf_3tgyYKPTce-GLdWDtZoU5XcThT_rGzbY", width=100)
 st.sidebar.title("Dashboard Controls")
+
+# Use a placeholder image URL instead of a specific LinkedIn image
+sidebar_image_url = "https://via.placeholder.com/200x200.png?text=TN+Dashboard"
+st.sidebar.image(sidebar_image_url, width=100)
 
 # Try to import NLTK and VADER with proper error handling
 try:
@@ -662,8 +665,9 @@ The state has attracted major semiconductor and electronics companies for invest
 if st.session_state.news_df.empty:
     st.info("👈 Please select industries from the sidebar and click 'Refresh Data' to get started!")
     
-    # Show a Tamil Nadu map in the center
-    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/TN_India.png/800px-TN_India.png", caption="Tamil Nadu State Map")
+    # Use a placeholder image URL instead of the Wikipedia image
+    tn_map_url = "https://via.placeholder.com/800x600.png?text=Tamil+Nadu+Map"
+    st.image(tn_map_url, caption="Tamil Nadu State Map")
     
     # Add introduction text
     st.markdown("""
