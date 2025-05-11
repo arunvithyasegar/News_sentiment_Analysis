@@ -25,11 +25,100 @@ st.set_page_config(
     page_title="Tamil Nadu News Sentiment Dashboard",
     page_icon="📰",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'About': "# Tamil Nadu News Sentiment Analysis\nCreated by Arun V"
+    }
 )
 
+# Custom CSS for better styling
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        color: #1E3A8A;
+        text-align: center;
+        margin-bottom: 1rem;
+        font-weight: bold;
+    }
+    .sub-header {
+        font-size: 1.8rem;
+        color: #2563EB;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+    }
+    .card {
+        background-color: #F3F4F6;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid #E5E7EB;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .metric-container {
+        display: flex;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .metric-card {
+        background-color: white;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        flex: 1;
+        min-width: 120px;
+        text-align: center;
+    }
+    .positive-text { color: #10B981; }
+    .neutral-text { color: #6B7280; }
+    .negative-text { color: #EF4444; }
+    .news-item {
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        border-left: 5px solid;
+    }
+    .news-item.positive { border-left-color: #10B981; background-color: #ECFDF5; }
+    .news-item.neutral { border-left-color: #6B7280; background-color: #F9FAFB; }
+    .news-item.negative { border-left-color: #EF4444; background-color: #FEF2F2; }
+    .source-tag {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        background-color: #E5E7EB;
+        margin-right: 5px;
+    }
+    .location-tag {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        background-color: #DBEAFE;
+        margin-right: 5px;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 24px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: transparent;
+        border-radius: 4px 4px 0 0;
+        gap: 1px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #F3F4F6;
+        border-bottom: 2px solid #2563EB;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # App title and description
-st.title("📰 Tamil Nadu News Sentiment Analysis Dashboard")
+st.markdown("<h1 class='main-header'>📰 Tamil Nadu News Sentiment Analysis Dashboard</h1>", unsafe_allow_html=True)
 
 st.markdown("""
 This dashboard scrapes the latest news about Tamil Nadu from various sources, 
@@ -37,7 +126,7 @@ analyzes the sentiment of headlines, and visualizes the results.
 """)
 
 # Create sidebar
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/8/81/TamilNadu_Logo.svg", width=100)
+st.sidebar.image("https://media.licdn.com/dms/image/v2/D5603AQER_Q4BRk3EOA/profile-displayphoto-shrink_200_200/B56ZYla9dOHEAY-/0/1744384547325?e=1752710400&v=beta&t=xhakBODVDf_3tgyYKPTce-GLdWDtZoU5XcThT_rGzbY", width=100)
 st.sidebar.title("Dashboard Controls")
 
 # Download VADER lexicon if not already downloaded
@@ -46,11 +135,18 @@ def download_nltk_resources():
     try:
         nltk.data.find('vader_lexicon')
     except LookupError:
-        nltk.download('vader_lexicon')
+        try:
+            nltk.download('vader_lexicon', quiet=True)
+        except Exception as e:
+            st.error(f"Failed to download VADER lexicon: {e}")
+            return False
+    return True
 
-download_nltk_resources()
+# Initialize NLTK and VADER
+if not download_nltk_resources():
+    st.error("Could not initialize sentiment analysis. Please check your internet connection.")
+    st.stop()
 
-# Initialize the sentiment analyzer
 sid = SentimentIntensityAnalyzer()
 
 # Function to determine sentiment category
@@ -130,6 +226,16 @@ def scrape_google_news(keywords, max_results=10):
     
     return news_list
 
+# Function to make safe HTTP requests
+def safe_request(url, timeout=10):
+    try:
+        response = requests.get(url, timeout=timeout)
+        response.raise_for_status()
+        return response
+    except requests.RequestException as e:
+        st.error(f"Error making request: {e}")
+        return None
+
 # Function to get news from NewsAPI
 def get_news_from_newsapi(api_key, keywords, max_results=10):
     news_list = []
@@ -140,7 +246,10 @@ def get_news_from_newsapi(api_key, keywords, max_results=10):
             query_terms = " OR ".join(keywords)
             url = f'https://newsdata.io/api/1/news?apikey={api_key}&q=({query_terms}) AND (Tamil Nadu OR Chennai OR Coimbatore OR Madurai)&language=en'
             
-            response = requests.get(url)
+            response = safe_request(url)
+            if response is None:
+                return []
+            
             if response.status_code == 200:
                 data = response.json()
                 articles = data.get('results', [])
@@ -207,6 +316,18 @@ def collect_and_analyze_news(api_key, search_areas):
     else:
         return pd.DataFrame(columns=['title', 'url', 'timestamp', 'source', 'location', 'sentiment', 'sentiment_score'])
 
+# Add this after the news collection functions
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def get_cached_news(api_key, search_areas):
+    try:
+        df = collect_and_analyze_news(api_key, search_areas)
+        if df is not None and not df.empty:
+            return df
+        return pd.DataFrame(columns=['title', 'url', 'timestamp', 'source', 'location', 'sentiment', 'sentiment_score'])
+    except Exception as e:
+        st.error(f"Error collecting news: {e}")
+        return pd.DataFrame(columns=['title', 'url', 'timestamp', 'source', 'location', 'sentiment', 'sentiment_score'])
+
 # NewsAPI key input (with a default value for demo)
 api_key = st.sidebar.text_input("Enter NewsAPI Key", value="pub_86076086703c94c2637e240672a4a90a30ad9")
 
@@ -234,11 +355,12 @@ if st.sidebar.button("Refresh Data"):
         st.warning("Please select at least one industry to track.")
     else:
         with st.spinner("Collecting and analyzing news..."):
-            # Store the results in session state
-            st.session_state.news_df = collect_and_analyze_news(api_key, selected_industries)
-            
-            if len(st.session_state.news_df) == 0:
-                st.error("No news articles found. Try different search terms or check your API key.")
+            try:
+                st.session_state.news_df = get_cached_news(api_key, selected_industries)
+                if st.session_state.news_df.empty:
+                    st.warning("No news articles found. Try different search terms or check your API key.")
+            except Exception as e:
+                st.error(f"Error refreshing data: {e}")
 
 # Initialize session state for news_df if it doesn't exist
 if 'news_df' not in st.session_state:
@@ -460,34 +582,39 @@ if not st.session_state.news_df.empty:
             filtered_df = filtered_df.sort_values('sentiment_score', ascending=True)
         
         # Display news articles
-        for index, row in filtered_df.iterrows():
-            # Determine card color based on sentiment
-            if row['sentiment'] == 'Positive':
-                card_bg = "#e6f4ea"  # Light green
-                border_color = "#4CAF50"
-            elif row['sentiment'] == 'Negative':
-                card_bg = "#fce8e6"  # Light red
-                border_color = "#F44336"
-            else:
-                card_bg = "#e8f0fe"  # Light blue
-                border_color = "#2196F3"
+        def display_news_item(row):
+            sentiment_colors = {
+                'Positive': '#ECFDF5',
+                'Neutral': '#F9FAFB',
+                'Negative': '#FEF2F2'
+            }
+            border_colors = {
+                'Positive': '#10B981',
+                'Neutral': '#6B7280',
+                'Negative': '#EF4444'
+            }
             
-            # Create card
-            with st.container():
-                st.markdown(
-                    f"""
-                    <div style="padding:15px; border-radius:5px; margin-bottom:10px; 
-                            background-color:{card_bg}; border-left:5px solid {border_color};">
-                        <h4 style="margin-top:0;">{row['title']}</h4>
-                        <p><strong>Date:</strong> {row['timestamp']}</p>
-                        <p><strong>Source:</strong> {row['source']}</p>
-                        <p><strong>Location:</strong> {row['location']}</p>
-                        <p><strong>Sentiment:</strong> {row['sentiment']} ({row['sentiment_score']:.2f})</p>
-                        <a href="{row['url']}" target="_blank">Read Full Article</a>
-                    </div>
-                    """, 
-                    unsafe_allow_html=True
-                )
+            bg_color = sentiment_colors.get(row['sentiment'], '#F9FAFB')
+            border_color = border_colors.get(row['sentiment'], '#6B7280')
+            
+            st.markdown(f"""
+            <div style="padding:15px; border-radius:5px; margin-bottom:10px; 
+                        background-color:{bg_color}; border-left:5px solid {border_color};">
+                <h4 style="margin-top:0;">{row['title']}</h4>
+                <p>
+                    <span class='source-tag'>{row['source']}</span>
+                    <span class='location-tag'>{row['location']}</span>
+                    <span>{row['timestamp']}</span>
+                </p>
+                <a href="{row['url']}" target="_blank">Read Full Article</a>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        if not filtered_df.empty:
+            for _, row in filtered_df.iterrows():
+                display_news_item(row)
+        else:
+            st.info("No news articles found. Try adjusting your search terms or refreshing the data.")
 
 # Add Tamil Nadu investment context at the bottom of sidebar
 st.sidebar.markdown("---")
@@ -534,7 +661,3 @@ if st.session_state.news_df.empty:
     
     Select your industries of interest from the sidebar and click "Refresh Data" to begin!
     """)
-
-# Footer
-st.markdown("---")
-st.markdown("📰 Tamil Nadu News Sentiment Analysis Dashboard • Created with Streamlit")
