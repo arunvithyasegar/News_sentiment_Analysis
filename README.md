@@ -89,7 +89,7 @@ News\_sentiment\_Analysis/
    ```bash
    git clone https://github.com/arunvithyasegar/News_sentiment_Analysis.git
    cd News_sentiment_Analysis
-````
+    ````
 
 2. **Create a Virtual Environment (optional)**:
 
