@@ -5,7 +5,22 @@ import time
 import pycountry
 import re
 from urllib.parse import quote_plus
-from config import NEWS_API_KEY, NEWS_API_ENDPOINTS
+try:
+    from config import (NEWS_API_KEY, NEWS_API_ENDPOINTS, 
+                       GNEWS_API_KEY, GNEWS_API_ENDPOINTS)
+except ImportError:
+    print("Config file not found. Using default settings.")
+    NEWS_API_KEY = "7afdf16c-ecc6-4589-a79e-4f5224c6aa08"
+    NEWS_API_BASE_URL = "https://newsapi.org/v2"
+    NEWS_API_ENDPOINTS = {
+        "everything": f"{NEWS_API_BASE_URL}/everything",
+        "top-headlines": f"{NEWS_API_BASE_URL}/top-headlines"
+    }
+    GNEWS_API_KEY = "your_gnews_api_key"
+    GNEWS_API_BASE_URL = "https://gnews.io/api/v4"
+    GNEWS_API_ENDPOINTS = {
+        "search": f"{GNEWS_API_BASE_URL}/search"
+    }
 
 def extract_countries(text):
     """Extract country mentions from text"""
@@ -53,7 +68,10 @@ def scrape_google_news(keywords, num_articles=5):
     return articles
 
 def fetch_from_newsapi(keywords, num_articles):
-    headers = {'Authorization': f'Bearer {NEWS_API_KEY}'}
+    if not NEWS_API_KEY:
+        raise ValueError("NewsAPI key is not configured")
+    
+    headers = {'X-Api-Key': NEWS_API_KEY}  # Changed from Bearer to X-Api-Key
     
     # Join keywords with OR for the query
     query = ' OR '.join(k.strip() for k in keywords)
@@ -64,7 +82,7 @@ def fetch_from_newsapi(keywords, num_articles):
     
     params = {
         'q': query,
-        'pageSize': min(num_articles, 100),  # NewsAPI limit is 100
+        'pageSize': min(num_articles, 100),
         'language': 'en',
         'from': start_date.strftime('%Y-%m-%d'),
         'to': end_date.strftime('%Y-%m-%d'),
@@ -72,43 +90,136 @@ def fetch_from_newsapi(keywords, num_articles):
     }
     
     try:
+        endpoint = NEWS_API_ENDPOINTS.get('everything')
+        if not endpoint:
+            raise ValueError("NewsAPI endpoint not configured")
+            
         response = requests.get(
-            NEWS_API_ENDPOINTS['everything'],
+            endpoint,
             headers=headers,
             params=params
         )
         
-        if response.status_code == 200:
-            articles = response.json().get('articles', [])
-            return [
-                {
-                    'title': article['title'],
-                    'url': article['url'],
-                    'timestamp': article['publishedAt'],
-                    'source': article['source']['name'],
-                    'country': article.get('country', 'N/A')
-                }
-                for article in articles
-            ]
-        else:
-            print(f"API Error: {response.status_code} - {response.text}")
-            return []
+        response.raise_for_status()  # Raise exception for bad status codes
+        data = response.json()
+        
+        if data.get('status') != 'ok':
+            raise ValueError(f"API Error: {data.get('message', 'Unknown error')}")
             
+        articles = data.get('articles', [])
+        return [
+            {
+                'title': article['title'],
+                'url': article['url'],
+                'timestamp': article['publishedAt'],
+                'source': article['source']['name'],
+                'country': extract_countries(article['title'])
+            }
+            for article in articles
+        ]
+            
+    except requests.exceptions.RequestException as e:
+        print(f"Network Error: {str(e)}")
+        return []
+    except ValueError as e:
+        print(f"API Error: {str(e)}")
+        return []
     except Exception as e:
-        print(f"Error fetching news: {str(e)}")
+        print(f"Unexpected Error: {str(e)}")
         return []
 
-def scrape_news(source, keywords, num_articles=20):
-    """Main function to scrape news from selected source with error handling"""
+def fetch_from_gnews(keywords, num_articles):
+    """Fetch news from GNews API"""
+    if not GNEWS_API_KEY:
+        raise ValueError("GNews API key is not configured")
+    
+    # Join keywords with AND for better results
+    query = ' AND '.join(k.strip() for k in keywords)
+    
+    params = {
+        'q': query,
+        'token': GNEWS_API_KEY,
+        'max': min(num_articles, 100),
+        'lang': 'en',
+        'sortby': 'publishedAt'
+    }
+    
     try:
-        if source == "Google News":
-            return scrape_google_news(keywords, num_articles)
-        elif source == "NewsAPI":
-            return fetch_from_newsapi(keywords, num_articles)
-        else:
-            # Fallback to Google News if selected source is not implemented
-            print(f"Source {source} not implemented, falling back to Google News")
-            return scrape_google_news(keywords, num_articles)
+        endpoint = GNEWS_API_ENDPOINTS.get('search')
+        if not endpoint:
+            raise ValueError("GNews API endpoint not configured")
+            
+        response = requests.get(
+            endpoint,
+            params=params,
+            timeout=10
+        )
+        
+        response.raise_for_status()
+        data = response.json()
+        
+        articles = data.get('articles', [])
+        return [
+            {
+                'title': article['title'],
+                'url': article['url'],
+                'timestamp': article['publishedAt'],
+                'source': article['source']['name'],
+                'country': extract_countries(article['title'])
+            }
+            for article in articles
+        ]
+            
+    except requests.exceptions.RequestException as e:
+        print(f"GNews API Network Error: {str(e)}")
+        return []
+    except Exception as e:
+        print(f"GNews API Error: {str(e)}")
+        return []
+
+def filter_business_tech_news(articles, keywords):
+    """Filter articles related to electronics, semiconductors, or manufacturing"""
+    tech_keywords = [
+        'electronics', 'semiconductor', 'manufacturing', 'chip', 'technology',
+        'processor', 'hardware', 'circuit', 'production', 'factory'
+    ]
+    
+    filtered_articles = []
+    for article in articles:
+        title = article['title'].lower()
+        if any(keyword.lower() in title for keyword in tech_keywords):
+            filtered_articles.append(article)
+    
+    return filtered_articles
+
+def scrape_news(source, keywords, num_articles=20):
+    """Main function to scrape exactly 20 relevant business tech headlines"""
+    if not isinstance(keywords, list):
+        keywords = [k.strip() for k in keywords.split(',')]
+    
+    # Request more articles initially to ensure we get enough after filtering
+    fetch_count = min(100, num_articles * 3)
+    
+    try:
+        results = []
+        
+        # Try multiple sources if needed to get enough articles
+        for api_source in [fetch_from_newsapi, fetch_from_gnews, scrape_google_news]:
+            if len(results) >= num_articles:
+                break
+                
+            try:
+                new_articles = api_source(keywords, fetch_count)
+                if new_articles:
+                    # Filter for relevant articles
+                    filtered = filter_business_tech_news(new_articles, keywords)
+                    results.extend(filtered)
+            except Exception as e:
+                print(f"Error with source {api_source.__name__}: {str(e)}")
+        
+        # Ensure we return exactly num_articles results
+        return results[:num_articles] if results else []
+            
     except Exception as e:
         print(f"Error in news scraping: {str(e)}")
-        return None
+        return []
