@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 import matplotlib.pyplot as plt
 import time
+import requests
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from wordcloud import WordCloud
@@ -111,10 +112,10 @@ elif page == "News Sentiment Analysis":
         help="Select how often to automatically fetch new headlines"
     )
     
-    # Options for news sources
+    # Simplified news source selection - focusing on NewsAPI
     news_source = st.selectbox(
         "Select News Source",
-        ["Google News", "NewsAPI", "Reuters", "Bloomberg", "Manual Input"]
+        ["NewsAPI", "Manual Input"]
     )
     
     # Keywords for filtering news
@@ -134,8 +135,20 @@ elif page == "News Sentiment Analysis":
     # Create a progress bar placeholder
     progress_bar = st.empty()
     
-    # Last updated timestamp
-    last_updated = st.empty()
+    # Add API status indicator
+    st.sidebar.markdown("### API Status")
+    try:
+        response = requests.get(
+            NEWS_API_ENDPOINTS['everything'],
+            headers={'Authorization': f'Bearer {NEWS_API_KEY}'},
+            params={'q': 'test', 'pageSize': 1}
+        )
+        if response.status_code == 200:
+            st.sidebar.success("NewsAPI: Connected")
+        else:
+            st.sidebar.error(f"NewsAPI Error: {response.status_code}")
+    except Exception as e:
+        st.sidebar.error(f"NewsAPI Connection Error: {str(e)}")
     
     # Button to fetch and analyze news
     col1, col2 = st.columns([1, 4])

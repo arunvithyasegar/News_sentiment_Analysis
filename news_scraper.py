@@ -1,10 +1,11 @@
 import feedparser
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import pycountry
 import re
 from urllib.parse import quote_plus
+from config import NEWS_API_KEY, NEWS_API_ENDPOINTS
 
 def extract_countries(text):
     """Extract country mentions from text"""
@@ -51,11 +52,59 @@ def scrape_google_news(keywords, num_articles=5):
     
     return articles
 
+def fetch_from_newsapi(keywords, num_articles):
+    headers = {'Authorization': f'Bearer {NEWS_API_KEY}'}
+    
+    # Join keywords with OR for the query
+    query = ' OR '.join(k.strip() for k in keywords)
+    
+    # Calculate date range (last 30 days)
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=30)
+    
+    params = {
+        'q': query,
+        'pageSize': min(num_articles, 100),  # NewsAPI limit is 100
+        'language': 'en',
+        'from': start_date.strftime('%Y-%m-%d'),
+        'to': end_date.strftime('%Y-%m-%d'),
+        'sortBy': 'publishedAt'
+    }
+    
+    try:
+        response = requests.get(
+            NEWS_API_ENDPOINTS['everything'],
+            headers=headers,
+            params=params
+        )
+        
+        if response.status_code == 200:
+            articles = response.json().get('articles', [])
+            return [
+                {
+                    'title': article['title'],
+                    'url': article['url'],
+                    'timestamp': article['publishedAt'],
+                    'source': article['source']['name'],
+                    'country': article.get('country', 'N/A')
+                }
+                for article in articles
+            ]
+        else:
+            print(f"API Error: {response.status_code} - {response.text}")
+            return []
+            
+    except Exception as e:
+        print(f"Error fetching news: {str(e)}")
+        return []
+
 def scrape_news(source, keywords, num_articles=20):
     """Main function to scrape news from selected source with error handling"""
     try:
         if source == "Google News":
             return scrape_google_news(keywords, num_articles)
+        elif source == "NewsAPI":
+            return fetch_from_newsapi(keywords, num_articles)
         else:
             # Fallback to Google News if selected source is not implemented
             print(f"Source {source} not implemented, falling back to Google News")
