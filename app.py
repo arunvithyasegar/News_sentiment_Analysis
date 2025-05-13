@@ -1,223 +1,354 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import plotly.express as px
 import matplotlib.pyplot as plt
-import time
 import requests
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from wordcloud import WordCloud
-from news_scraper import scrape_news
-from sentiment_analysis import analyze_sentiment, create_sentiment_visualizations
+import json
+from datetime import datetime
+import re
+from textblob import TextBlob
+import time
+import plotly.express as px
+import plotly.graph_objects as go
+from streamlit_lottie import st_lottie
 
 # Set page configuration
 st.set_page_config(
-    page_title="News Sentiment Analysis Dashboard",
-    page_icon="📊",
+    page_title="Guidance Tamil Nadu Dashboard",
+    page_icon="🏭",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Add custom CSS
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #1E88E5;
-        text-align: center;
-        margin-bottom: 1rem;
-    }
-    .sub-header {
-        font-size: 1.8rem;
-        font-weight: bold;
-        color: #333;
-        margin-top: 2rem;
-        margin-bottom: 1rem;
-    }
-    .section-header {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #555;
-        margin-top: 1.5rem;
-        margin-bottom: 0.8rem;
-    }
-    .highlight {
-        background-color: #f0f7ff;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 0.5rem solid #1E88E5;
-    }
-    .footer {
-        text-align: center;
-        margin-top: 3rem;
-        padding: 1rem;
-        background-color: #f5f5f5;
-        border-radius: 0.5rem;
-        font-size: 0.9rem;
-        color: #555;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Function to load Lottie animations
+def load_lottieurl(url):
+    r = requests.get(url)
+    if r.status_code != 200:
+        return None
+    return r.json()
 
-# Dashboard Header
-st.markdown("<div class='main-header'>News Sentiment Analysis Dashboard</div>", unsafe_allow_html=True)
-st.markdown("### GUIDANCE – BIU TEAM ASSIGNMENT")
+# Function to extract country mentions from text
+def extract_country(text):
+    # List of common countries that might be mentioned in business news
+    countries = ["India", "USA", "China", "Japan", "Germany", "UK", "France", 
+                 "South Korea", "Taiwan", "Malaysia", "Vietnam", "Singapore", 
+                 "Thailand", "Indonesia", "Philippines", "Europe", "Tamil Nadu"]
+    
+    found_countries = []
+    for country in countries:
+        if re.search(r'\b' + re.escape(country) + r'\b', text, re.IGNORECASE):
+            found_countries.append(country)
+    
+    if found_countries:
+        return ", ".join(found_countries)
+    return "Global"
 
-# Sidebar for navigation
-st.sidebar.title("Navigation")
-page = st.sidebar.radio(
-    "Select a Section",
-    ["Home", "News Sentiment Analysis", "About"]
-)
+# Function to perform sentiment analysis
+def analyze_sentiment(text):
+    analysis = TextBlob(text)
+    polarity = analysis.sentiment.polarity
+    
+    if polarity > 0.1:
+        return "Positive"
+    elif polarity < -0.1:
+        return "Negative"
+    else:
+        return "Neutral"
 
-# Home Page
-if page == "Home":
-    st.markdown("<div class='sub-header'>Welcome to the Real-Time News Dashboard</div>", unsafe_allow_html=True)
+# Function to fetch news
+def fetch_news(api_key, query="electronics OR semiconductors OR manufacturing", language="en", page_size=20):
+    url = f"https://newsapi.org/v2/everything?q={query}&language={language}&pageSize={page_size}&apiKey={api_key}"
     
-    st.markdown("""
-    <div class='highlight'>
-    This interactive dashboard provides real-time analysis for:
-    <ul>
-        <li><b>Live News Sentiment Analysis</b>: Real-time sentiment analysis of latest news headlines related to electronics, semiconductors, or manufacturing</li>
-    </ul>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("<div class='section-header'>Instructions</div>", unsafe_allow_html=True)
-    st.markdown("""
-    - Use the sidebar to navigate to the News Sentiment Analysis section
-    - In the News Sentiment Analysis section, you can:
-        - View live news headlines as they are published
-        - Get instant sentiment analysis results
-        - See real-time sentiment distribution visualizations
-        - Set up auto-refresh intervals
-    """)
-    
-    # Sample visualization for the home page
-    st.markdown("<div class='section-header'>Live Dashboard Preview</div>", unsafe_allow_html=True)
-    
-    st.image("https://miro.medium.com/max/1400/1*Uu0RqBu1CgEfSLUzQEFIHw.png", 
-             caption="Real-Time Sentiment Analysis Visualization")
+    try:
+        response = requests.get(url)
+        data = response.json()
+        
+        if data.get("status") != "ok":
+            st.error(f"Error fetching news: {data.get('message', 'Unknown error')}")
+            return None
+            
+        articles = data.get("articles", [])
+        
+        # Process the articles to extract relevant information
+        processed_articles = []
+        for article in articles:
+            title = article.get("title", "No title")
+            url = article.get("url", "#")
+            published_at = article.get("publishedAt", "")
+            
+            # Format the timestamp
+            if published_at:
+                try:
+                    published_date = datetime.strptime(published_at, "%Y-%m-%dT%H:%M:%SZ")
+                    formatted_date = published_date.strftime("%Y-%m-%d %H:%M")
+                except:
+                    formatted_date = published_at
+            else:
+                formatted_date = "Unknown"
+            
+            # Extract country mentions
+            content = article.get("description", "") + " " + title
+            country = extract_country(content)
+            
+            # Perform sentiment analysis
+            sentiment = analyze_sentiment(title)
+            
+            processed_articles.append({
+                "title": title,
+                "url": url,
+                "timestamp": formatted_date,
+                "country": country,
+                "sentiment": sentiment
+            })
+        
+        return processed_articles
+    except Exception as e:
+        st.error(f"Error fetching news: {str(e)}")
+        return None
 
-# News Sentiment Analysis Page
-elif page == "News Sentiment Analysis":
-    st.markdown("<div class='sub-header'>Business Tech News Sentiment Analysis</div>", unsafe_allow_html=True)
+# Define the app layout and functionality
+def main():
+    # Sidebar
+    st.sidebar.title("Guidance Tamil Nadu")
     
-    # Default keywords focused on tech and manufacturing
-    default_keywords = "electronics, semiconductors, manufacturing, technology"
-    keywords = st.text_input(
-        "Enter keywords for news filtering (comma-separated)",
-        value=default_keywords
+    # Add Lottie animation to sidebar
+    lottie_factory = load_lottieurl("https://assets9.lottiefiles.com/packages/lf20_qp1q7mct.json")
+    if lottie_factory:
+        st_lottie(lottie_factory, height=200, key="factory")
+    
+    # Sidebar navigation
+    page = st.sidebar.selectbox(
+        "Navigation",
+        ["Dashboard", "News Analysis", "About"]
     )
     
-    fetch_button = st.button("Analyze Latest Headlines")
-    
-    if fetch_button:
-        with st.spinner("Fetching and analyzing headlines..."):
-            # Get exactly 20 relevant headlines
-            news_data = scrape_news("NewsAPI", keywords, 20)
-            
-            if news_data and len(news_data) == 20:
-                # Perform sentiment analysis
-                results = analyze_sentiment(news_data)
-                results_df = pd.DataFrame(results)
-                
-                # Display results in tabs
-                tab1, tab2, tab3 = st.tabs(["Headlines", "Sentiment Analysis", "Data Export"])
-                
-                with tab1:
-                    st.markdown("### Latest Business Tech Headlines")
-                    for idx, row in results_df.iterrows():
-                        with st.expander(f"{row['title']} ({row['sentiment']})"):
-                            st.write(f"Source: {row['source']}")
-                            st.write(f"Country: {row['country']}")
-                            st.write(f"Sentiment Score: {row['sentiment_score']:.2f}")
-                            st.write(f"URL: {row['url']}")
-                
-                with tab2:
-                    st.markdown("### Sentiment Distribution")
-                    fig = create_sentiment_visualizations(results_df)
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Add sentiment statistics
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Positive Headlines", 
-                                len(results_df[results_df['sentiment'] == 'Positive']))
-                    with col2:
-                        st.metric("Neutral Headlines", 
-                                len(results_df[results_df['sentiment'] == 'Neutral']))
-                    with col3:
-                        st.metric("Negative Headlines", 
-                                len(results_df[results_df['sentiment'] == 'Negative']))
-                
-                with tab3:
-                    st.markdown("### Export Data")
-                    csv = results_df.to_csv(index=False)
-                    st.download_button(
-                        "Download Results CSV",
-                        csv,
-                        "news_sentiment_analysis.csv",
-                        "text/csv"
-                    )
-            else:
-                st.error("Could not fetch enough relevant headlines. Please try again.")
+    # Set a default API key
+    DEFAULT_API_KEY = "8357a2cfb61d426abe449df18e7d86e1"
 
-# About Page
-elif page == "About":
-    st.markdown("<div class='sub-header'>About This Project</div>", unsafe_allow_html=True)
+    # Modify the API Key input to use the default key if no input is provided
+    api_key = st.sidebar.text_input("Enter NewsAPI Key", type="password", value=DEFAULT_API_KEY)
     
-    st.markdown("""
-    <div class='highlight'>
-    <h3>Assignment Details</h3>
-    <p>This dashboard was created as part of the GUIDANCE – BIU TEAM ASSIGNMENT for Guidance Tamil Nadu.</p>
+    # Search parameters
+    if page == "News Analysis":
+        st.sidebar.subheader("Search Parameters")
+        query = st.sidebar.text_input("Search Query", "electronics OR semiconductors OR manufacturing")
+        language = st.sidebar.selectbox("Language", ["en", "ta", "hi"], index=0)
+        news_count = st.sidebar.slider("Number of Headlines", min_value=5, max_value=50, value=20)
+    else:
+        query = "electronics OR semiconductors OR manufacturing"
+        language = "en"
+        news_count = 20
     
-    <h4>Part 2: Web Scraping & Sentiment Analysis</h4>
-    <p>The assignment required:</p>
-    <ul>
-        <li>Web scraping from publicly accessible news sources</li>
-        <li>Collection of business headlines related to electronics, semiconductors, or manufacturing</li>
-        <li>Extraction of title, URL, timestamp, and country mentioned</li>
-        <li>Sentiment analysis using libraries like TextBlob or VADER</li>
-        <li>Visualization of sentiment distribution</li>
-    </ul>
-    </div>
-    """, unsafe_allow_html=True)
+    # Main content
+    if page == "Dashboard":
+        st.title("📊 Industrial Insights Dashboard")
+        
+        # Display sections in columns
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.header("Recent Industry News")
+            if api_key:
+                # Fetch news
+                news_data = fetch_news(api_key, query, language, news_count)
+                
+                if news_data:
+                    # Display news in an interactive table
+                    df = pd.DataFrame(news_data)
+                    
+                    # Add clickable links
+                    def make_clickable(url, title):
+                        return f'<a href="{url}" target="_blank">{title}</a>'
+                    
+                    df['clickable_title'] = df.apply(lambda row: make_clickable(row['url'], row['title']), axis=1)
+                    
+                    # Apply styling based on sentiment
+                    def style_sentiment(val):
+                        if val == "Positive":
+                            return 'background-color: rgba(0, 255, 0, 0.2)'
+                        elif val == "Negative":
+                            return 'background-color: rgba(255, 0, 0, 0.2)'
+                        else:
+                            return 'background-color: rgba(255, 255, 0, 0.1)'
+                    
+                    styled_df = df[['clickable_title', 'timestamp', 'country', 'sentiment']]
+                    styled_df = styled_df.style.applymap(style_sentiment, subset=['sentiment'])
+                    
+                    st.write(styled_df.to_html(escape=False), unsafe_allow_html=True)
+                else:
+                    st.info("Enter a valid API key to fetch news")
+            else:
+                st.info("Enter your NewsAPI key in the sidebar to fetch news")
+        
+        with col2:
+            st.header("Quick Stats")
+            if api_key and 'df' in locals():
+                # Calculate sentiment distribution
+                sentiment_counts = df['sentiment'].value_counts()
+                
+                # Create a pie chart for sentiment distribution
+                fig = px.pie(
+                    values=sentiment_counts.values,
+                    names=sentiment_counts.index,
+                    title="Sentiment Distribution",
+                    color=sentiment_counts.index,
+                    color_discrete_map={
+                        'Positive': 'green',
+                        'Neutral': 'gold',
+                        'Negative': 'red'
+                    }
+                )
+                fig.update_traces(textposition='inside', textinfo='percent+label')
+                st.plotly_chart(fig)
+                
+                # Create a bar chart for country distribution
+                country_counts = df['country'].str.split(', ').explode().value_counts().head(10)
+                fig2 = px.bar(
+                    x=country_counts.index,
+                    y=country_counts.values,
+                    title="Top Countries Mentioned",
+                    labels={'x': 'Country', 'y': 'Count'},
+                    color=country_counts.index
+                )
+                st.plotly_chart(fig2)
     
-    st.markdown("<div class='section-header'>Technologies Used</div>", unsafe_allow_html=True)
+    elif page == "News Analysis":
+        st.title("📰 News Sentiment Analysis")
+        
+        if api_key:
+            with st.spinner("Fetching and analyzing news..."):
+                news_data = fetch_news(api_key, query, language, news_count)
+                
+                if news_data:
+                    df = pd.DataFrame(news_data)
+                    
+                    # Display detailed sentiment analysis
+                    st.subheader("Sentiment Analysis Results")
+                    
+                    # Create tabs for different views
+                    tab1, tab2, tab3 = st.tabs(["Overview", "Detailed Analysis", "Data Table"])
+                    
+                    with tab1:
+                        # Summary metrics
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            positive_count = (df['sentiment'] == 'Positive').sum()
+                            st.metric("Positive Headlines", positive_count, delta=None)
+                        
+                        with col2:
+                            neutral_count = (df['sentiment'] == 'Neutral').sum() 
+                            st.metric("Neutral Headlines", neutral_count, delta=None)
+                        
+                        with col3:
+                            negative_count = (df['sentiment'] == 'Negative').sum()
+                            st.metric("Negative Headlines", negative_count, delta=None)
+                        
+                        # Sentiment bar chart
+                        sentiment_data = df['sentiment'].value_counts().reset_index()
+                        sentiment_data.columns = ['Sentiment', 'Count']
+                        
+                        fig = px.bar(
+                            sentiment_data,
+                            x='Sentiment',
+                            y='Count',
+                            color='Sentiment',
+                            color_discrete_map={
+                                'Positive': 'green',
+                                'Neutral': 'gold',
+                                'Negative': 'red'
+                            },
+                            title="Distribution of Sentiments Across Headlines"
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    with tab2:
+                        # Country-wise sentiment analysis
+                        st.subheader("Country-wise Sentiment Analysis")
+                        
+                        # Split countries and create a new dataframe with one country per row
+                        country_df = df.copy()
+                        country_df['country'] = country_df['country'].str.split(', ')
+                        country_df = country_df.explode('country')
+                        
+                        # Group by country and sentiment
+                        country_sentiment = country_df.groupby(['country', 'sentiment']).size().reset_index(name='count')
+                        
+                        # Filter for countries with at least 2 mentions
+                        country_counts = country_df['country'].value_counts()
+                        relevant_countries = country_counts[country_counts >= 2].index.tolist()
+                        
+                        if relevant_countries:
+                            filtered_country_sentiment = country_sentiment[country_sentiment['country'].isin(relevant_countries)]
+                            
+                            # Create a grouped bar chart
+                            fig = px.bar(
+                                filtered_country_sentiment, 
+                                x='country', 
+                                y='count', 
+                                color='sentiment',
+                                barmode='group',
+                                color_discrete_map={
+                                    'Positive': 'green',
+                                    'Neutral': 'gold',
+                                    'Negative': 'red'
+                                },
+                                title="Sentiment Distribution by Country"
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            st.info("Not enough country data to analyze trends")
+                    
+                    with tab3:
+                        # Show the raw data
+                        st.subheader("Headlines Data")
+                        st.dataframe(df)
+                        
+                        # Allow download of data
+                        csv = df.to_csv(index=False)
+                        st.download_button(
+                            label="Download Data as CSV",
+                            data=csv,
+                            file_name="news_sentiment_data.csv",
+                            mime="text/csv",
+                        )
+                else:
+                    st.error("Failed to fetch news data. Please check your API key and try again.")
+        else:
+            st.info("Enter your NewsAPI key in the sidebar to perform news analysis")
     
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
+    elif page == "About":
+        st.title("ℹ️ About Guidance Tamil Nadu Assessment")
+        
         st.markdown("""
-        **Web Development**
-        - Streamlit
-        - Python
-        - HTML/CSS
+        ## Project Overview
+        
+        This dashboard was created as part of an assessment for Guidance Tamil Nadu. It demonstrates:
+        
+        1. **Web Scraping**: Fetching real-time news headlines related to electronics, semiconductors, and manufacturing.
+        
+        2. **Sentiment Analysis**: Using TextBlob to classify news headlines as positive, neutral, or negative.
+        
+        3. **Data Visualization**: Creating interactive charts to visualize sentiment distribution and geographical trends.
+        
+        ## Technologies Used
+        
+        - **Streamlit**: For creating the interactive web application
+        - **NewsAPI**: For fetching current news headlines
+        - **TextBlob**: For sentiment analysis
+        - **Plotly**: For interactive data visualizations
+        - **Pandas**: For data manipulation and analysis
+        
+        ## How to Use
+        
+        1. Enter your NewsAPI key in the sidebar
+        2. Navigate between different sections using the sidebar menu
+        3. Customize search parameters to focus on specific news topics
+        4. Explore the sentiment analysis and visualizations
+        
+        ## Contact
+        
+        For any queries regarding this assessment, please contact Guidance Tamil Nadu.
         """)
-    
-    with col2:
-        st.markdown("""
-        **Data Analysis**
-        - Pandas
-        - NumPy
-        - NLTK
-        """)
-    
-    with col3:
-        st.markdown("""
-        **Visualization**
-        - Plotly
-        - Matplotlib
-        - WordCloud
-        """)
-# Add footer
-st.markdown("""
-<div class='footer'>
-    <p>Submitted to: Guidance Tamil Nadu - BIU Team</p>
-    <p>Assignment Part 2: Web Scraping & Sentiment Analysis</p>
-    <p>© 2023 All Rights Reserved</p>
-</div>
-""", unsafe_allow_html=True)
+
+# Run the app
+if __name__ == "__main__":
+    main()
